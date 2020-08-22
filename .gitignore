@@ -1,3 +1,6 @@
 /target
 *.env*
 shaken.toml*
+commands.toml
+*.db
+/.vscode/*

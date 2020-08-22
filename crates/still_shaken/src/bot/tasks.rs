@@ -1,30 +1,50 @@
 use super::{Handler, Responder};
 
 use async_channel::Sender;
-use twitchchat::messages::Privmsg;
+use twitchchat::{messages::Privmsg, runner::Identity};
 
 use std::{collections::BTreeSet, sync::Arc, time::Instant};
 
 pub struct Tasks {
     tasks: Vec<(Instant, Task)>,
+    identity: Arc<Identity>,
     responder: Responder,
 }
 
 impl Tasks {
-    pub const fn new(responder: Responder) -> Self {
+    pub fn new<I>(responder: Responder, identity: I) -> Self
+    where
+        I: Into<Arc<Identity>>,
+    {
         Self {
             tasks: Vec::new(),
             responder,
+            identity: identity.into(),
         }
+    }
+
+    pub fn with<C>(mut self, cmd: C) -> Self
+    where
+        C: Handler + Send + Sync,
+    {
+        self.spawn(cmd);
+        self
     }
 
     pub fn spawn<C>(&mut self, cmd: C)
     where
         C: Handler + Send + Sync,
     {
-        let (tx, rx) = async_channel::bounded(32);
+        let (tx, stream) = async_channel::bounded(32);
+
+        let context = super::Context {
+            identity: self.identity.clone(),
+            responder: self.responder.clone(),
+            stream,
+        };
+
         let task = Task {
-            inner: cmd.sink(rx, self.responder.clone()),
+            inner: cmd.spawn(context),
             sink: tx,
         };
 
@@ -32,7 +52,10 @@ impl Tasks {
         self.tasks.push((now, task));
     }
 
-    pub fn send_all(&mut self, msg: impl Into<Arc<Privmsg<'static>>>) {
+    pub fn send_all<M>(&mut self, msg: M)
+    where
+        M: Into<Arc<Privmsg<'static>>>,
+    {
         let msg = msg.into();
 
         let mut bad = BTreeSet::<Instant>::new();

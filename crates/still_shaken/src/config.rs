@@ -1,27 +1,33 @@
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Config {
     pub identity: Identity,
     pub modules: Modules,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Identity {
     pub name: String,
     pub channels: Vec<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Modules {
     pub shaken: Shaken,
+    pub commands: Commands,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Shaken {
     pub host: String,
     pub timeout: u64,
     pub delay_lower: u64,
     pub delay_upper: u64,
     pub ignore_chance: f64,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct Commands {
+    pub commands_file: String,
 }
 
 impl Config {
@@ -59,6 +65,9 @@ impl Config {
             delay_lower   = 100
             delay_upper   = 3000
             ignore_chance = 0.25
+
+            [modules.commands]
+            commands_file = "commands.toml"
         };
         let data = toml::to_string_pretty(&data).unwrap();
         std::fs::write("shaken.toml.example", &data).unwrap();

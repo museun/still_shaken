@@ -1,7 +1,8 @@
-use super::{Config, Responder, Response, Shaken, Tasks, Writer};
+use super::{Commands, Config, Responder, Response, Shaken, Tasks, Writer};
 
 use futures_lite::StreamExt;
-use twitchchat::{messages::Commands, Status};
+use rand::Rng;
+use twitchchat::{messages::Commands as TwitchCommands, runner::Identity, Status};
 
 pub struct Runner {
     config: Config,
@@ -19,6 +20,7 @@ impl Runner {
             .enable_all_capabilities()
             .build()?;
 
+        log::info!("connecting to Twitch");
         twitchchat::AsyncRunner::connect(connector, &user_config)
             .await
             .map_err(Into::into)
@@ -27,6 +29,7 @@ impl Runner {
 
     pub async fn join_channel(&mut self) -> anyhow::Result<()> {
         for channel in &self.config.identity.channels {
+            log::info!("joining '{}'", channel);
             match self.runner.join(channel).await {
                 Err(twitchchat::RunnerError::BannedFromChannel { channel }) => {
                     log::error!("cannot join '{}'. we're banned", channel);
@@ -42,14 +45,19 @@ impl Runner {
 
     pub async fn run_to_completion<R>(mut self, rng: R) -> anyhow::Result<()>
     where
-        R: rand::Rng + Send + Sync + 'static + Clone,
+        R: Rng + Send + Sync + 'static + Clone,
     {
         let responder = Self::create_responder(self.runner.writer());
-        let mut tasks = Self::create_tasks(&self.config, responder, rng);
+        let mut tasks = Self::create_tasks(
+            &self.config, //
+            responder,
+            self.runner.identity.clone(),
+            rng,
+        );
 
         loop {
             match self.runner.next_message().await? {
-                Status::Message(Commands::Privmsg(msg)) => {
+                Status::Message(TwitchCommands::Privmsg(msg)) => {
                     tasks.send_all(msg);
                 }
 
@@ -77,16 +85,13 @@ impl Runner {
         })
     }
 
-    fn create_tasks<R>(config: &Config, responder: Responder, rng: R) -> Tasks
+    fn create_tasks<R>(config: &Config, responder: Responder, identity: Identity, rng: R) -> Tasks
     where
-        R: rand::Rng + Send + Sync + 'static + Clone,
+        R: Rng + Send + Sync + 'static + Clone,
     {
-        let mut tasks = Tasks::new(responder);
-
-        let shaken = Shaken::new(&config, rng);
-        tasks.spawn(shaken);
-
-        tasks
+        Tasks::new(responder, identity)
+            .with(Shaken::new(&config.modules.shaken, rng))
+            .with(Commands::new(&config.modules.commands))
     }
 
     fn create_responder(mut writer: Writer) -> Responder {
@@ -95,7 +100,7 @@ impl Runner {
         smol::Task::spawn(async move {
             while let Some(resp) = rx.next().await {
                 if let Err(..) = writer.encode(resp).await {
-                    // do something here
+                    break;
                 }
             }
         })
