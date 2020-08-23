@@ -1,4 +1,4 @@
-use super::{Config, Context, Handler, PrivmsgExt};
+use super::{Context, Handler, PrivmsgExt};
 
 use futures_lite::StreamExt as _;
 use rand::{prelude::*, Rng};
@@ -37,7 +37,7 @@ impl<R> Handler for Shaken<R>
 where
     R: Rng + Send + Sync + 'static,
 {
-    fn sink(mut self, mut context: Context) -> smol::Task<()> {
+    fn spawn(mut self, mut context: Context) -> smol::Task<()> {
         let fut = async move {
             while let Some(msg) = context.stream.next().await {
                 if let Err(err) = self.handle(&*msg, &mut context).await {
