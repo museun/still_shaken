@@ -1,4 +1,5 @@
 use super::{dont_care, Context, DontCare};
+use crate::util::shrink_string;
 
 use futures_lite::StreamExt;
 use twitchchat::messages::Privmsg;
@@ -61,7 +62,7 @@ fn fixup_description(out: &mut String, desc: String) {
     });
 
     out.push_str(" | ");
-    out.push_str(crate::shrink_string(&*s, 400));
+    out.push_str(shrink_string(&*s, 400));
 }
 
 #[derive(serde::Deserialize)]
@@ -74,20 +75,17 @@ struct Crate {
 }
 
 async fn lookup(query: &str) -> anyhow::Result<Vec<Crate>> {
-    fn lookup(query: String) -> anyhow::Result<Vec<Crate>> {
-        #[derive(serde::Deserialize)]
-        struct Resp {
-            crates: Vec<Crate>,
-        }
-
-        let req = attohttpc::get(&format!(
-            "https://crates.io/api/v1/crates?page=1&per_page=1&q={}",
-            query
-        ));
-        let resp = req.send()?.json::<Resp>()?;
-        anyhow::Result::Ok(resp.crates)
+    #[derive(serde::Deserialize)]
+    struct Resp {
+        crates: Vec<Crate>,
     }
 
-    let query = query.to_string();
-    smol::unblock! { lookup(query )}
+    let ep = format!(
+        "https://crates.io/api/v1/crates?page=1&per_page=1&q={}",
+        query
+    );
+
+    crate::http::get_json(&ep)
+        .await
+        .map(|resp: Resp| resp.crates)
 }

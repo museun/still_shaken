@@ -120,16 +120,14 @@ where
                 data: String,
             }
 
-            let data = loop {
-                let response = attohttpc::get(&*host)
-                    .json(&serde_json::json!({
-                        "min": MIN,
-                        "max": MAX,
-                        "context": &context
-                    }))?
-                    .send()?
-                    .json::<Response>()?;
+            let body = serde_json::json!({
+                "min": MIN,
+                "max": MAX,
+                "context": &context
+            });
 
+            let data = loop {
+                let response: Response = crate::http::sync_get_json_with_body(&*host, &body)?;
                 if response.data.len() > MIN_LEN {
                     break response.data;
                 }
