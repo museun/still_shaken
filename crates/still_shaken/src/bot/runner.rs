@@ -1,4 +1,4 @@
-use super::{Commands, Config, Responder, Response, Shaken, Tasks, Writer};
+use super::{Commands, Config, Responder, Response, Shaken, Tasks};
 
 use futures_lite::StreamExt;
 use rand::Rng;
@@ -27,7 +27,7 @@ impl Runner {
             .map(|runner| Self { config, runner })
     }
 
-    pub async fn join_channel(&mut self) -> anyhow::Result<()> {
+    pub async fn join_channels(&mut self) -> anyhow::Result<()> {
         for channel in &self.config.identity.channels {
             log::info!("joining '{}'", channel);
             match self.runner.join(channel).await {
@@ -92,17 +92,20 @@ impl Runner {
         Tasks::new(responder, identity)
             .with(Shaken::new(&config.modules.shaken, rng))
             .with(Commands::new(&config.modules.commands))
+            .with(super::crates::lookup_crate)
     }
 
-    fn create_responder(mut writer: Writer) -> Responder {
+    fn create_responder(mut writer: twitchchat::Writer) -> Responder {
         let (tx, mut rx) = async_channel::bounded::<Response>(32);
 
         smol::Task::spawn(async move {
             while let Some(resp) = rx.next().await {
                 if let Err(..) = writer.encode(resp).await {
+                    log::warn!("cannot write response");
                     break;
                 }
             }
+            log::info!("end of respond loop");
         })
         .detach();
 

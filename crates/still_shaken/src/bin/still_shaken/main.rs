@@ -3,13 +3,8 @@ use still_shaken::{Config, Runner};
 use rand::prelude::*;
 
 fn init_logger() -> anyhow::Result<()> {
-    alto_logger::TermLogger::new(
-        alto_logger::Options::default()
-            .with_style(alto_logger::StyleConfig::MultiLine)
-            .with_time(alto_logger::TimeConfig::unix_timestamp()),
-    )?
-    .init()
-    .map_err(Into::into)
+    alto_logger::init_alt_term_logger()?;
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -23,7 +18,7 @@ fn main() -> anyhow::Result<()> {
 
     let fut = async move {
         let mut bot = Runner::connect(config).await?;
-        bot.join_channel().await?;
+        bot.join_channels().await?;
         bot.run_to_completion(rng).await
     };
     smol::run(fut)

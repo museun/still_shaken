@@ -13,32 +13,38 @@ impl Responder {
         Self { sender }
     }
 
-    pub fn say<R>(&self, msg: &Privmsg<'_>, resp: R)
+    pub fn say<R>(&self, msg: &Privmsg<'_>, resp: R) -> anyhow::Result<()>
     where
         R: Into<String>,
     {
+        let data: Box<str> = resp.into().trim().into();
         let say = Say {
-            channel: msg.channel().to_string().into_boxed_str(),
-            data: resp.into().into_boxed_str(),
+            channel: msg.channel().into(),
+            data,
         };
         log::debug!("say: {:?}", say);
-        let _ = self.sender.try_send(Response::Say(say));
+        self.sender.try_send(Response::Say(say))?;
+        Ok(())
     }
 
-    pub fn reply<R>(&self, msg: &Privmsg<'_>, resp: R)
+    pub fn reply<R>(&self, msg: &Privmsg<'_>, resp: R) -> anyhow::Result<()>
     where
         R: Into<String>,
     {
+        let data: Box<str> = resp.into().trim().into();
         let reply = Reply {
-            channel: msg.channel().to_string().into_boxed_str(),
-            msg_id: msg.tags().get("id").unwrap().to_string().into_boxed_str(),
-            data: resp.into().into_boxed_str(),
+            channel: msg.channel().into(),
+            msg_id: msg.tags().get("id").unwrap().into(),
+            data,
         };
         log::debug!("reply: {:?}", reply);
-        let _ = self.sender.try_send(Response::Reply(reply));
+        self.sender.try_send(Response::Reply(reply))?;
+        Ok(())
     }
 
-    pub fn nothing(&self) {}
+    pub fn nothing(&self) -> anyhow::Result<()> {
+        crate::error::dont_care()
+    }
 }
 
 #[derive(Debug)]
@@ -65,7 +71,8 @@ impl twitchchat::Encodable for Reply {
     where
         W: Write + ?Sized,
     {
-        commands::reply(&self.channel, &self.msg_id, &self.data).encode(buf)
+        commands::reply(&self.channel, &self.msg_id, &self.data).encode(buf)?;
+        buf.flush()
     }
 }
 
@@ -74,7 +81,8 @@ impl twitchchat::Encodable for Say {
     where
         W: Write + ?Sized,
     {
-        commands::privmsg(&self.channel, &self.data).encode(buf)
+        commands::privmsg(&self.channel, &self.data).encode(buf)?;
+        buf.flush()
     }
 }
 
@@ -86,6 +94,7 @@ impl twitchchat::Encodable for Response {
         match self {
             Response::Reply(reply) => reply.encode(buf),
             Response::Say(say) => say.encode(buf),
-        }
+        }?;
+        buf.flush()
     }
 }

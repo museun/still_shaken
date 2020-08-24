@@ -47,7 +47,7 @@ pub struct Environment {
 }
 
 impl Environment {
-    fn insert<K, F>(mut self, key: K, d: F) -> Self
+    pub fn insert<K, F>(mut self, key: K, d: F) -> Self
     where
         K: Into<String>,
         F: DisplayFn + 'static,

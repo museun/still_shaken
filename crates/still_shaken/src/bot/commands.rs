@@ -1,6 +1,7 @@
-use super::{Cmd, Context, Handler, Responder};
+use super::{Cmd, Context, DontCare, Handler, PrivmsgExt, Responder};
 use crate::{
     config,
+    format::FormatTime,
     template::{Environment, SimpleTemplate, Template},
 };
 
@@ -10,16 +11,19 @@ use twitchchat::messages::Privmsg;
 use std::collections::HashMap;
 
 pub struct Commands {
-    env: Environment,
     config: config::Commands, // TODO make this reloadable at runtime
     channels: HashMap<String, Channel>,
+    start: std::time::Instant,
 }
 
 impl Handler for Commands {
     fn spawn(mut self, mut context: Context) -> smol::Task<()> {
         smol::Task::spawn(async move {
             while let Some(msg) = context.stream.next().await {
-                let _ = self.handle(&*msg, &mut context.responder);
+                let _ = self
+                    .handle(&*msg, &mut context.responder)
+                    .is_real_error()
+                    .map(|err| log::error!("commands: {}", err));
             }
         })
     }
@@ -38,10 +42,75 @@ impl Commands {
             .collect();
 
         Self {
-            env: Environment::default(),
             config: config.clone(),
             channels,
+            start: std::time::Instant::now(),
         }
+    }
+
+    fn handle(&mut self, msg: &Privmsg<'_>, responder: &mut Responder) -> anyhow::Result<()> {
+        let Cmd { head, arg, body } = match Cmd::parse(msg) {
+            Some(cmd) => cmd,
+            None => really_dont_care!(),
+        };
+
+        let elevated = msg.is_broadcaster() || msg.is_moderator();
+
+        match (head, arg) {
+            ("add", Some(arg)) if elevated => {
+                if let Some(ch) = self.channels.get(msg.channel()) {
+                    if ch.commands.contains_key(arg) {
+                        return responder.reply(msg, format!("'{}' already exists", arg));
+                    }
+                }
+                self.update_template(msg, responder, arg, body)?;
+                return responder.nothing();
+            }
+
+            ("edit", Some(arg)) if elevated => {
+                let ch = self.channels.get(msg.channel());
+                if ch.is_none() || !ch.unwrap().commands.contains_key(arg) {
+                    return responder.reply(msg, format!("'{}' does not exist", arg));
+                }
+                self.update_template(msg, responder, arg, body)?;
+                return responder.nothing();
+            }
+
+            ("remove", Some(arg)) if elevated => {
+                let out = match self.channels.get_mut(msg.channel()) {
+                    Some(ch) => {
+                        if !ch.remove_command(arg) {
+                            format!("'{}' does not exist", arg)
+                        } else {
+                            format!("removed '{}'", arg)
+                        }
+                    }
+                    None => format!("'{}' does not exist", arg),
+                };
+
+                if let Err(err) = self.sync_commands() {
+                    log::error!("cannot sync commands: {}", err);
+                }
+
+                return responder.reply(msg, out);
+            }
+            _ => {}
+        }
+
+        if let Some(template) = self
+            .channels
+            .get(msg.channel())
+            .and_then(|ch| ch.commands.get(head))
+        {
+            let env = Environment::default()
+                .insert("name", msg.user_name().to_string())
+                .insert("channel", msg.channel().to_string())
+                .insert("uptime", self.start.elapsed().relative_time());
+            let resp = template.apply(&env);
+            return responder.say(msg, resp);
+        }
+
+        responder.nothing()
     }
 
     fn sync_commands(&self) -> anyhow::Result<()> {
@@ -71,18 +140,14 @@ impl Commands {
         responder: &mut Responder,
         cmd: &str,
         body: Option<&str>,
-    ) {
+    ) -> anyhow::Result<()> {
         let body = match body {
             Some(body) => body,
-            None => {
-                responder.reply(msg, "try again. you provided an empty command body");
-                return;
-            }
+            None => return responder.reply(msg, "try again. you provided an empty command body"),
         };
 
         if body.starts_with('.') | body.starts_with('/') {
-            responder.reply(msg, "lol");
-            return;
+            return responder.reply(msg, "lol");
         }
 
         log::info!(
@@ -91,80 +156,15 @@ impl Commands {
             body.escape_debug()
         );
 
-        responder.reply(msg, format!("updated '{}' -> '{}'", cmd, body));
-
-        let template = SimpleTemplate::new(cmd, body);
+        responder.reply(msg, format!("updated '{}' -> '{}'", cmd, body))?;
 
         self.channels
             .entry(msg.channel().to_string())
             .or_default()
             .add_template(cmd, SimpleTemplate::new(cmd, body));
 
-        if let Err(err) = self.sync_commands() {
-            log::error!("cannot save commands: {}", err)
-        }
-    }
-
-    fn handle(&mut self, msg: &Privmsg<'_>, responder: &mut Responder) {
-        let Cmd { head, arg, body } = match Cmd::parse(msg) {
-            Some(p) => p,
-            None => return,
-        };
-
-        let elevated = msg.is_broadcaster() || msg.is_moderator();
-
-        match (head, arg) {
-            ("add", Some(arg)) if elevated => {
-                if let Some(ch) = self.channels.get(msg.channel()) {
-                    if ch.commands.contains_key(arg) {
-                        responder.reply(msg, format!("'{}' already exists", arg));
-                        return;
-                    }
-                }
-                self.update_template(msg, responder, arg, body);
-                return;
-            }
-
-            ("edit", Some(arg)) if elevated => {
-                let ch = self.channels.get(msg.channel());
-                if ch.is_none() || !ch.unwrap().commands.contains_key(arg) {
-                    responder.reply(msg, format!("'{}' does not exist", arg));
-                    return;
-                }
-                self.update_template(msg, responder, arg, body);
-                return;
-            }
-
-            ("remove", Some(arg)) if elevated => {
-                let out = match self.channels.get_mut(msg.channel()) {
-                    Some(ch) => {
-                        if !ch.remove_command(arg) {
-                            format!("'{}' does not exist", arg)
-                        } else {
-                            format!("removed '{}'", arg)
-                        }
-                    }
-                    None => format!("'{}' does not exist", arg),
-                };
-
-                if let Err(err) = self.sync_commands() {
-                    log::error!("cannot sync commands: {}", err);
-                }
-
-                responder.reply(msg, out);
-                return;
-            }
-            _ => {}
-        }
-
-        if let Some(resp) = self
-            .channels
-            .get(msg.channel())
-            .and_then(|ch| ch.commands.get(head))
-            .map(|s| s.apply(&self.env))
-        {
-            responder.say(msg, resp);
-        }
+        self.sync_commands()?;
+        Ok(())
     }
 }
 

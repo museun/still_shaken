@@ -61,12 +61,12 @@ where
         if msg.data() == "!speak" || msg.is_mentioned(&*context.identity) {
             let response = Self::fetch_response(self.generate.clone(), None).await?;
             let response = Self::fixup_response(response);
-            context.responder.say(&msg, response);
+            let _ = context.responder.say(&msg, response);
             return Ok(());
         }
 
         if let Some(data) = self.generate(msg.data()).await? {
-            context.responder.say(&msg, data)
+            let _ = context.responder.say(&msg, data);
         }
 
         Ok(())

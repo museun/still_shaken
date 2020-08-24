@@ -1,10 +1,11 @@
 use crate::{
+    error::*,
     responder::{Responder, Response},
     Config,
 };
 
 use async_channel::Receiver;
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 use twitchchat::{messages::Privmsg, runner::Identity};
 
 mod runner;
@@ -16,13 +17,25 @@ use shaken::Shaken;
 mod commands;
 use commands::Commands;
 
+mod crates;
+
 mod tasks;
 use tasks::Tasks;
 
-pub type Writer = twitchchat::writer::AsyncWriter<twitchchat::writer::MpscWriter>;
-
 pub trait Handler {
     fn spawn(self, context: Context) -> smol::Task<()>;
+}
+
+impl<F, R> Handler for F
+where
+    F: Fn(Context) -> R + Send + Sync,
+    R: Future<Output = ()> + Send + Sync + 'static,
+    R::Output: Send + Sync + 'static,
+{
+    fn spawn(self, context: Context) -> smol::Task<()> {
+        let fut = (self)(context);
+        smol::Task::spawn(fut)
+    }
 }
 
 pub struct Context {
@@ -33,6 +46,7 @@ pub struct Context {
 
 pub trait PrivmsgExt {
     fn is_mentioned(&self, identity: &Identity) -> bool;
+    fn user_name(&self) -> &str;
 }
 
 impl<'a> PrivmsgExt for Privmsg<'a> {
@@ -43,6 +57,9 @@ impl<'a> PrivmsgExt for Privmsg<'a> {
             Some(s) if s.starts_with(username) && s.ends_with(':') => true,
             _ => false,
         }
+    }
+    fn user_name(&self) -> &str {
+        self.display_name().unwrap_or_else(|| self.name())
     }
 }
 
