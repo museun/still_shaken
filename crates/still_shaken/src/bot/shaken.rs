@@ -60,7 +60,7 @@ where
     ) -> anyhow::Result<()> {
         if msg.data() == "!speak" || msg.is_mentioned(&*context.identity) {
             let response = Self::fetch_response(self.generate.clone(), None).await?;
-            let response = Self::fixup_response(response);
+            let response = fixup_response(response);
             let _ = context.responder.say(&msg, response);
             return Ok(());
         }
@@ -81,7 +81,7 @@ where
 
         let context = self.choose_context(context).map(ToString::to_string);
         let response = Self::fetch_response(self.generate.clone(), context).await?;
-        let response = Self::fixup_response(response);
+        let response = fixup_response(response);
 
         // random delay
         self.random_delay().await;
@@ -101,18 +101,10 @@ where
         smol::Timer::new(delay).await;
     }
 
-    fn filtered_context(s: &str) -> bool {
-        !s.starts_with("http") || !s.starts_with('!') || !s.starts_with('.')
-    }
-
-    fn fixup_response(response: String) -> String {
-        "~ ".to_string() + &response
-    }
-
     fn choose_context<'a>(&mut self, context: &'a str) -> Option<&'a str> {
         context
             .split_whitespace()
-            .filter(|&s| Self::filtered_context(s))
+            .filter(|&s| filtered_context(s))
             .choose(&mut self.rng)
     }
 
@@ -146,4 +138,12 @@ where
             anyhow::Result::<_, anyhow::Error>::Ok(data)
         })
     }
+}
+
+fn filtered_context(s: &str) -> bool {
+    !s.starts_with("http") && !s.starts_with('!') && !s.starts_with('.')
+}
+
+fn fixup_response(response: String) -> String {
+    "~ ".to_string() + &response
 }
