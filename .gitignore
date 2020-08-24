@@ -4,3 +4,4 @@ shaken.toml*
 commands.toml
 *.db
 /.vscode/*
+/.cargo/*

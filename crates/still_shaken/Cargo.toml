@@ -9,7 +9,7 @@ default-run = "still_shaken"
 alto_logger     = "0.3.7"
 anyhow          = "1.0.32"
 async-channel   = "1.4.0"
-attohttpc       = { version = "0.15.0", default-features = false, features = ["json", "tls"] }
+attohttpc       = { version = "0.15.0", default-features = false, features = ["json", "tls-rustls"] }
 futures-lite    = "0.1.11"
 log             = "0.4.11"
 rand            = { version = "0.7.3", features = ["small_rng"] }
