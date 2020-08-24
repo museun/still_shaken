@@ -60,7 +60,7 @@ where
         context: &mut Context,
     ) -> anyhow::Result<()> {
         if msg.data() == "!speak" || msg.is_mentioned(&*context.identity) {
-            let response = Self::fetch_response(self.generate.clone(), None).await?;
+            let response = Self::fetch_response(&*self.generate, None).await?;
             let response = fixup_response(response);
             let _ = context.responder.say(&msg, response);
             return Ok(());
@@ -81,7 +81,7 @@ where
         }
 
         let context = self.choose_context(context).map(ToString::to_string);
-        let response = Self::fetch_response(self.generate.clone(), context).await?;
+        let response = Self::fetch_response(&*self.generate, context).await?;
         let response = fixup_response(response);
 
         // random delay
@@ -109,33 +109,22 @@ where
             .choose(&mut self.rng)
     }
 
-    async fn fetch_response(host: Arc<String>, context: Option<String>) -> anyhow::Result<String> {
-        const MIN: usize = 1;
-        const MAX: usize = 45;
-        const MIN_LEN: usize = 1;
+    async fn fetch_response(host: &str, context: Option<String>) -> anyhow::Result<String> {
+        #[derive(Debug, serde::Deserialize)]
+        struct Response {
+            status: String,
+            data: String,
+        }
 
-        smol::unblock!({
-            #[derive(Debug, serde::Deserialize)]
-            struct Response {
-                status: String,
-                data: String,
-            }
+        let body = serde_json::json!({
+            "min": 1,
+            "max": 45,
+            "context": &context
+        });
 
-            let body = serde_json::json!({
-                "min": MIN,
-                "max": MAX,
-                "context": &context
-            });
-
-            let data = loop {
-                let response: Response = crate::http::sync_get_json_with_body(&*host, &body)?;
-                if response.data.len() > MIN_LEN {
-                    break response.data;
-                }
-            };
-
-            anyhow::Result::<_, anyhow::Error>::Ok(data)
-        })
+        crate::http::get_json_with_body(host, body)
+            .await
+            .map(|resp: Response| resp.data)
     }
 }
 
