@@ -23,6 +23,7 @@ async fn handle(msg: &Privmsg<'_>, context: &mut Context) -> anyhow::Result<()> 
     let mut crates = match lookup(input).await {
         Ok(crates) => crates,
         Err(err) => {
+            log::error!("cannot lookup crate: {}", err);
             let resp = "I cannot do a lookup on crates.io :(";
             return context.responder.reply(msg, resp);
         }

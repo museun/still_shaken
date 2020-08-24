@@ -1,4 +1,3 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_variables))]
 #[macro_use]
 mod error;
 
@@ -9,7 +8,6 @@ mod config;
 pub use config::Config;
 
 mod responder;
-
 mod template;
 
 mod format {
