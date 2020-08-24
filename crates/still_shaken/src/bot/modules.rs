@@ -1,6 +1,6 @@
 use super::*;
-
 use rand::Rng;
+use twitchchat::runner::Identity;
 
 mod shaken;
 use shaken::Shaken;
@@ -10,7 +10,12 @@ use commands::Commands;
 
 mod crates;
 
-pub fn create_tasks<R>(config: &Config, responder: Responder, identity: Identity, rng: R) -> Tasks
+pub fn create_tasks<R>(
+    config: &Config, //
+    responder: Responder,
+    identity: Identity,
+    rng: R,
+) -> Tasks
 where
     R: Rng + Send + Sync + 'static + Clone,
 {

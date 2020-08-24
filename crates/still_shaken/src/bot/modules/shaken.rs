@@ -1,4 +1,5 @@
-use super::{Context, Handler, PrivmsgExt};
+use super::{Context, Handler};
+use crate::util::PrivmsgExt as _;
 
 use futures_lite::StreamExt as _;
 use rand::{prelude::*, Rng};

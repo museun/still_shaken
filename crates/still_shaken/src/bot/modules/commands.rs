@@ -1,8 +1,9 @@
-use super::{Cmd, Context, DontCare, Handler, PrivmsgExt, Responder};
+use super::{Cmd, Context, DontCare, Handler, Responder};
 use crate::{
     config,
     format::FormatTime,
     template::{Environment, SimpleTemplate, Template},
+    util::PrivmsgExt as _,
 };
 
 use futures_lite::StreamExt as _;
