@@ -1,8 +1,8 @@
-use super::{Commands, Config, Responder, Response, Shaken, Tasks};
+use super::{Config, Responder, Response};
 
 use futures_lite::StreamExt;
 use rand::Rng;
-use twitchchat::{messages::Commands as TwitchCommands, runner::Identity, Status};
+use twitchchat::{messages::Commands as TwitchCommands, Status};
 
 pub struct Runner {
     config: Config,
@@ -48,7 +48,7 @@ impl Runner {
         R: Rng + Send + Sync + 'static + Clone,
     {
         let responder = Self::create_responder(self.runner.writer());
-        let mut tasks = Self::create_tasks(
+        let mut tasks = super::modules::create_tasks(
             &self.config, //
             responder,
             self.runner.identity.clone(),
@@ -83,16 +83,6 @@ impl Runner {
                 OAUTH_ENV_VAR
             )
         })
-    }
-
-    fn create_tasks<R>(config: &Config, responder: Responder, identity: Identity, rng: R) -> Tasks
-    where
-        R: Rng + Send + Sync + 'static + Clone,
-    {
-        Tasks::new(responder, identity)
-            .with(Shaken::new(&config.modules.shaken, rng))
-            .with(Commands::new(&config.modules.commands))
-            .with(super::crates::lookup_crate)
     }
 
     fn create_responder(mut writer: twitchchat::Writer) -> Responder {

@@ -11,16 +11,10 @@ use twitchchat::{messages::Privmsg, runner::Identity};
 mod runner;
 pub use runner::Runner;
 
-mod shaken;
-use shaken::Shaken;
-
-mod commands;
-use commands::Commands;
-
-mod crates;
-
 mod tasks;
 use tasks::Tasks;
+
+mod modules;
 
 pub trait Handler {
     fn spawn(self, context: Context) -> smol::Task<()>;

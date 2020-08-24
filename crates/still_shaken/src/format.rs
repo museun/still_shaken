@@ -50,28 +50,5 @@ impl FormatTime for std::time::Duration {
         }
 
         time.join(" ")
-
-        // let dur = time::Duration::new(self.as_secs() as _, self.as_nanos() as _);
-
-        // macro_rules! format_time {
-        //     ($($expr:tt => $class:expr)*) => {{
-        //         $(
-        //             match dur.$expr() {
-        //                 0 => { }
-        //                 1 => { return format!("1 {}", $class) }
-        //                 n => { return format!("{} {}s", n, $class) }
-        //             };
-        //         )*
-        //         String::from("just now")
-        //     }};
-        // }
-
-        // format_time! {
-        //     whole_weeks   => "week"
-        //     whole_days    => "day"
-        //     whole_hours   => "hour"
-        //     whole_minutes => "minute"
-        //     whole_seconds => "second"
-        // }
     }
 }
