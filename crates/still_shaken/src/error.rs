@@ -31,7 +31,7 @@ impl<T> DontCare<T> for Option<T> {
 }
 
 impl<T> DontCare<T> for Result<T, anyhow::Error> {
-    fn dont_care(self) -> anyhow::Result<T> {
+    fn dont_care(self) -> Self {
         self.map_err(|_| DontCareSigil.into())
     }
 

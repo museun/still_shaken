@@ -92,8 +92,8 @@ impl twitchchat::Encodable for Response {
         W: Write + ?Sized,
     {
         match self {
-            Response::Reply(reply) => reply.encode(buf),
-            Response::Say(say) => say.encode(buf),
+            Self::Reply(reply) => reply.encode(buf),
+            Self::Say(say) => say.encode(buf),
         }?;
         buf.flush()
     }

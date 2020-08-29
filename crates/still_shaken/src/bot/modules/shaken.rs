@@ -46,7 +46,7 @@ where
                 }
             }
         };
-        smol::Task::spawn(fut)
+        smol::spawn(fut)
     }
 }
 
@@ -62,12 +62,12 @@ where
         if msg.data() == "!speak" || msg.is_mentioned(&*context.identity) {
             let response = Self::fetch_response(&*self.generate, None).await?;
             let response = fixup_response(response);
-            let _ = context.responder.say(&msg, response);
+            let _ = context.responder.say(msg, response);
             return Ok(());
         }
 
         if let Some(data) = self.generate(msg.data()).await? {
-            let _ = context.responder.say(&msg, data);
+            let _ = context.responder.say(msg, data);
         }
 
         Ok(())
@@ -99,7 +99,7 @@ where
         let upper = self.rng.gen_range(lower, self.config.delay_upper);
         let range = self.rng.gen_range(self.config.delay_lower, upper);
         let delay = Duration::from_millis(range);
-        smol::Timer::new(delay).await;
+        smol::Timer::after(delay).await;
     }
 
     fn choose_context<'a>(&mut self, context: &'a str) -> Option<&'a str> {

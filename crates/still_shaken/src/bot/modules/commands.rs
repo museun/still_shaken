@@ -19,7 +19,7 @@ pub struct Commands {
 
 impl Handler for Commands {
     fn spawn(mut self, mut context: Context) -> smol::Task<()> {
-        smol::Task::spawn(async move {
+        smol::spawn(async move {
             while let Some(msg) = context.stream.next().await {
                 let _ = self
                     .handle(&*msg, &mut context.responder)

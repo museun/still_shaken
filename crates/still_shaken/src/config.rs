@@ -32,7 +32,7 @@ pub struct Commands {
 
 impl Config {
     pub fn load() -> Self {
-        match Config::load_from_file() {
+        match Self::load_from_file() {
             Ok(config) => config,
             Err(..) => Self::write_default(),
         }

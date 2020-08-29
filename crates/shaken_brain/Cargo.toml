@@ -5,7 +5,7 @@ authors = ["museun <museun@outlook.com>"]
 edition = "2018"
 
 [dependencies]
-alto_logger = "0.3.6"
+alto_logger = "0.3.7"
 anyhow      = "1.0.32"
 log         = "0.4.11"
 rand        = { version = "0.7.3", features = ["small_rng"] }

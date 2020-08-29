@@ -13,6 +13,6 @@ where
 {
     fn spawn(self, context: Context) -> smol::Task<()> {
         let fut = (self)(context);
-        smol::Task::spawn(fut)
+        smol::spawn(fut)
     }
 }

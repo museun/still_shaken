@@ -88,7 +88,7 @@ impl Runner {
     fn create_responder(mut writer: twitchchat::Writer) -> Responder {
         let (tx, mut rx) = async_channel::bounded::<Response>(32);
 
-        smol::Task::spawn(async move {
+        smol::spawn(async move {
             while let Some(resp) = rx.next().await {
                 if let Err(..) = writer.encode(resp).await {
                     log::warn!("cannot write response");
