@@ -6,7 +6,7 @@ where
     E: serde::Serialize + Send + Sync + 'static,
 {
     let ep = ep.to_string();
-    smol::unblock(move || sync_get_json_with_body(&*ep, &body)).await
+    blocking::unblock(move || sync_get_json_with_body(&*ep, &body)).await
 }
 
 pub async fn get_json<T>(ep: &str) -> anyhow::Result<T>
@@ -14,7 +14,7 @@ where
     for<'de> T: serde::Deserialize<'de> + Send + Sync + 'static,
 {
     let ep = ep.to_string();
-    smol::unblock(move || sync_get_json(&*ep)).await
+    blocking::unblock(move || sync_get_json(&*ep)).await
 }
 
 pub fn sync_get_json_with_body<T, E>(ep: &str, body: &E) -> anyhow::Result<T>

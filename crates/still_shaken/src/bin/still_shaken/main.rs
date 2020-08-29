@@ -18,5 +18,6 @@ fn main() -> anyhow::Result<()> {
         bot.join_channels().await?;
         bot.run_to_completion(rng).await
     };
-    smol::block_on(fut)
+
+    futures_lite::future::block_on(fut)
 }

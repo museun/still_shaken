@@ -1,4 +1,4 @@
-use super::{Config, Responder, Response};
+use super::{Config, Executor, Responder, Response};
 
 use futures_lite::StreamExt;
 use rand::Rng;
@@ -13,7 +13,7 @@ impl Runner {
     pub async fn connect(config: Config) -> anyhow::Result<Self> {
         let (name, token) = (&config.identity.name, Self::get_token()?);
 
-        let connector = twitchchat::connector::SmolConnector::twitch();
+        let connector = twitchchat::connector::AsyncIoConnectorTls::twitch();
         let user_config = twitchchat::UserConfig::builder()
             .name(name)
             .token(token)
@@ -47,11 +47,14 @@ impl Runner {
     where
         R: Rng + Send + Sync + 'static + Clone,
     {
-        let responder = Self::create_responder(self.runner.writer());
+        let (executor, _handle, _stop) = Executor::new(2);
+
+        let responder = Self::create_responder(self.runner.writer(), &executor);
         let mut tasks = super::modules::create_tasks(
             &self.config, //
             responder,
             self.runner.identity.clone(),
+            executor,
             rng,
         );
 
@@ -85,19 +88,20 @@ impl Runner {
         })
     }
 
-    fn create_responder(mut writer: twitchchat::Writer) -> Responder {
+    fn create_responder(mut writer: twitchchat::Writer, executor: &Executor) -> Responder {
         let (tx, mut rx) = async_channel::bounded::<Response>(32);
 
-        smol::spawn(async move {
-            while let Some(resp) = rx.next().await {
-                if let Err(..) = writer.encode(resp).await {
-                    log::warn!("cannot write response");
-                    break;
+        executor
+            .spawn(async move {
+                while let Some(resp) = rx.next().await {
+                    if let Err(..) = writer.encode(resp).await {
+                        log::warn!("cannot write response");
+                        break;
+                    }
                 }
-            }
-            log::info!("end of respond loop");
-        })
-        .detach();
+                log::info!("end of respond loop");
+            })
+            .detach();
 
         Responder::new(tx)
     }

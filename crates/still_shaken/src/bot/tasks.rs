@@ -3,16 +3,57 @@ use super::{Handler, Responder};
 use async_channel::Sender;
 use twitchchat::{messages::Privmsg, runner::Identity};
 
-use std::{collections::BTreeSet, sync::Arc, time::Instant};
+use std::{collections::BTreeSet, future::Future, sync::Arc, time::Instant};
+
+#[derive(Clone)]
+pub struct Executor {
+    inner: Arc<async_executor::Executor>,
+}
+
+impl Executor {
+    pub fn new(threads: usize) -> (Self, std::thread::JoinHandle<()>, async_channel::Sender<()>) {
+        let ex = Arc::new(async_executor::Executor::new());
+        let (stop_tx, stop_rx) = async_channel::bounded(1);
+
+        let handle = std::thread::spawn({
+            let ex = Arc::clone(&ex);
+            move || {
+                easy_parallel::Parallel::new()
+                    .each(0..threads, {
+                        let ex = Arc::clone(&ex);
+                        move |_| futures_lite::future::block_on(ex.run(stop_rx.recv()))
+                    })
+                    .finish(|| {
+                        futures_lite::future::block_on(async move {
+                            log::info!("stopping executors");
+                        })
+                    });
+            }
+        });
+
+        (Self { inner: ex }, handle, stop_tx)
+    }
+}
+
+impl Executor {
+    pub fn spawn<F, T>(&self, fut: F) -> async_executor::Task<T>
+    where
+        F: Future<Output = T> + Send + Sync + 'static,
+        T: Send + Sync + 'static,
+    {
+        self.inner.spawn(fut)
+    }
+}
 
 pub struct Tasks {
     tasks: Vec<(Instant, Task)>,
     identity: Arc<Identity>,
     responder: Responder,
+    executor: Executor,
 }
 
 impl Tasks {
-    pub fn new<I>(responder: Responder, identity: I) -> Self
+    pub fn new<I>(responder: Responder, identity: I, executor: Executor) -> Self
     where
         I: Into<Arc<Identity>>,
     {
@@ -20,6 +61,7 @@ impl Tasks {
             tasks: Vec::new(),
             responder,
             identity: identity.into(),
+            executor,
         }
     }
 
@@ -44,7 +86,7 @@ impl Tasks {
         };
 
         let task = Task {
-            inner: cmd.spawn(context),
+            inner: cmd.spawn(context, self.executor.clone()),
             sink: tx,
         };
 
@@ -80,6 +122,6 @@ impl Tasks {
 }
 
 struct Task {
-    inner: smol::Task<()>,
+    inner: async_executor::Task<()>,
     sink: Sender<Arc<Privmsg<'static>>>,
 }

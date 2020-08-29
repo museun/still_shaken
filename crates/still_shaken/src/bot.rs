@@ -8,7 +8,7 @@ mod runner;
 pub use runner::Runner;
 
 mod tasks;
-use tasks::Tasks;
+use tasks::{Executor, Tasks};
 
 mod cmd;
 use cmd::Cmd;

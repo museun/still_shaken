@@ -1,15 +1,15 @@
-use super::{Context, Handler};
-use crate::util::PrivmsgExt as _;
+use super::{Context, Executor, Handler};
+use crate::{config, util::PrivmsgExt as _};
 
+use async_executor::Task;
 use futures_lite::StreamExt as _;
 use rand::{prelude::*, Rng};
+use twitchchat::messages::Privmsg;
 
-use crate::config;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use twitchchat::messages::Privmsg;
 
 pub struct Shaken<R> {
     timeout: Duration,
@@ -38,7 +38,7 @@ impl<R> Handler for Shaken<R>
 where
     R: Rng + Send + Sync + 'static,
 {
-    fn spawn(mut self, mut context: Context) -> smol::Task<()> {
+    fn spawn(mut self, mut context: Context, executor: Executor) -> Task<()> {
         let fut = async move {
             while let Some(msg) = context.stream.next().await {
                 if let Err(err) = self.handle(&*msg, &mut context).await {
@@ -46,7 +46,7 @@ where
                 }
             }
         };
-        smol::spawn(fut)
+        executor.spawn(fut)
     }
 }
 
@@ -99,7 +99,7 @@ where
         let upper = self.rng.gen_range(lower, self.config.delay_upper);
         let range = self.rng.gen_range(self.config.delay_lower, upper);
         let delay = Duration::from_millis(range);
-        smol::Timer::after(delay).await;
+        async_io::Timer::after(delay).await;
     }
 
     fn choose_context<'a>(&mut self, context: &'a str) -> Option<&'a str> {

@@ -1,2 +1,32 @@
 [workspace]
 members = [ "crates/*" ]
+
+[patch.crates-io]
+async-tls = { git = "https://github.com/museun/async-tls", branch = "futures-lite" }
+attohttpc = { git = "https://github.com/museun/attohttpc", branch = "museun" }
+
+[profile.release]
+incremental = true
+debug = 0
+
+[profile.release.build-override]
+opt-level = 0
+
+[profile.release.package.cc]
+opt-level = 0
+
+[profile.release.package.serde]
+opt-level = 0
+
+[profile.release.package.serde_derive]
+opt-level = 0
+
+[profile.release.package.syn]
+opt-level = 0
+
+[profile.release.package.toml]
+opt-level = 0
+
+# TODO probably not this one
+[profile.release.package.rustls]
+opt-level = 0

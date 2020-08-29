@@ -1,4 +1,4 @@
-use super::{Cmd, Context, DontCare, Handler, Responder};
+use super::{Cmd, Context, DontCare, Executor, Handler, Responder};
 use crate::{
     config,
     format::FormatTime,
@@ -6,6 +6,7 @@ use crate::{
     util::PrivmsgExt as _,
 };
 
+use async_executor::Task;
 use futures_lite::StreamExt as _;
 use twitchchat::messages::Privmsg;
 
@@ -18,15 +19,16 @@ pub struct Commands {
 }
 
 impl Handler for Commands {
-    fn spawn(mut self, mut context: Context) -> smol::Task<()> {
-        smol::spawn(async move {
+    fn spawn(mut self, mut context: Context, executor: Executor) -> Task<()> {
+        let fut = async move {
             while let Some(msg) = context.stream.next().await {
                 let _ = self
                     .handle(&*msg, &mut context.responder)
                     .is_real_error()
                     .map(|err| log::error!("commands: {}", err));
             }
-        })
+        };
+        executor.spawn(fut)
     }
 }
 
