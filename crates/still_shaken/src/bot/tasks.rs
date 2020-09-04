@@ -11,35 +11,35 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(threads: usize) -> (Self, std::thread::JoinHandle<()>, async_channel::Sender<()>) {
+    pub fn new(threads: usize) -> Self {
         let ex = Arc::new(async_executor::Executor::new());
-        let (stop_tx, stop_rx) = async_channel::bounded(1);
 
-        let handle = std::thread::spawn({
-            let ex = Arc::clone(&ex);
-            move || {
-                easy_parallel::Parallel::new()
-                    .each(0..threads, {
-                        let ex = Arc::clone(&ex);
-                        move |_| futures_lite::future::block_on(ex.run(stop_rx.recv()))
-                    })
-                    .finish(|| {
-                        futures_lite::future::block_on(async move {
-                            log::info!("stopping executors");
-                        })
-                    });
-            }
-        });
+        for i in 1..=threads {
+            std::thread::Builder::new()
+                .name(format!("still_shaken-{}", i))
+                .spawn({
+                    let ex = Arc::clone(&ex);
+                    log::debug!("spawning executor thread");
+                    move || loop {
+                        let _ = std::panic::catch_unwind(|| {
+                            async_io::block_on(ex.run(futures_lite::future::pending::<()>()))
+                        });
 
-        (Self { inner: ex }, handle, stop_tx)
+                        log::debug!("end of executor thread ({})", i);
+                    }
+                })
+                .expect("named thread support");
+        }
+
+        Self { inner: ex }
     }
 }
 
 impl Executor {
     pub fn spawn<F, T>(&self, fut: F) -> async_executor::Task<T>
     where
-        F: Future<Output = T> + Send + Sync + 'static,
-        T: Send + Sync + 'static,
+        F: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
     {
         self.inner.spawn(fut)
     }
@@ -67,7 +67,7 @@ impl Tasks {
 
     pub fn with<C>(mut self, cmd: C) -> Self
     where
-        C: Handler + Send + Sync,
+        C: Handler + Send,
     {
         self.spawn(cmd);
         self
@@ -75,7 +75,7 @@ impl Tasks {
 
     pub fn spawn<C>(&mut self, cmd: C)
     where
-        C: Handler + Send + Sync,
+        C: Handler + Send,
     {
         let (tx, stream) = async_channel::bounded(32);
 

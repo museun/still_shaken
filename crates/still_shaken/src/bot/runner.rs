@@ -1,7 +1,6 @@
 use super::{Config, Executor, Responder, Response};
 
 use futures_lite::StreamExt;
-use rand::Rng;
 use twitchchat::{messages::Commands as TwitchCommands, Status};
 
 pub struct Runner {
@@ -43,15 +42,14 @@ impl Runner {
         Ok(())
     }
 
-    pub async fn run_to_completion<R>(mut self, rng: R) -> anyhow::Result<()>
-    where
-        R: Rng + Send + Sync + 'static + Clone,
-    {
-        let (executor, _handle, _stop) = Executor::new(2);
-
+    pub async fn run_to_completion(
+        mut self,
+        rng: fastrand::Rng,
+        executor: Executor,
+    ) -> anyhow::Result<()> {
         let responder = Self::create_responder(self.runner.writer(), &executor);
         let mut tasks = super::modules::create_tasks(
-            &self.config, //
+            &self.config,
             responder,
             self.runner.identity.clone(),
             executor,

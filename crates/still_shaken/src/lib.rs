@@ -2,7 +2,7 @@
 mod error;
 
 mod bot;
-pub use bot::Runner;
+pub use bot::{Executor, Runner};
 
 mod config;
 pub use config::Config;
@@ -13,3 +13,5 @@ mod template;
 mod format;
 mod http;
 mod util;
+
+pub use util::*;

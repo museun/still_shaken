@@ -3,7 +3,7 @@ use crate::{config, util::PrivmsgExt as _};
 
 use async_executor::Task;
 use futures_lite::StreamExt as _;
-use rand::{prelude::*, Rng};
+
 use twitchchat::messages::Privmsg;
 
 use std::{
@@ -11,19 +11,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct Shaken<R> {
+pub struct Shaken {
     timeout: Duration,
     generate: Arc<String>,
     config: config::Shaken,
     last: Option<Instant>,
-    rng: R,
+    rng: fastrand::Rng,
 }
 
-impl<R> Shaken<R> {
-    pub fn new(config: &config::Shaken, rng: R) -> Self
-    where
-        R: Rng + Send + Sync + 'static,
-    {
+impl Shaken {
+    pub fn new(config: &config::Shaken, rng: fastrand::Rng) -> Self {
         Self {
             timeout: Duration::from_millis(config.timeout),
             generate: Arc::new(format!("{}/generate", config.host)),
@@ -34,10 +31,7 @@ impl<R> Shaken<R> {
     }
 }
 
-impl<R> Handler for Shaken<R>
-where
-    R: Rng + Send + Sync + 'static,
-{
+impl Handler for Shaken {
     fn spawn(mut self, mut context: Context, executor: Executor) -> Task<()> {
         let fut = async move {
             while let Some(msg) = context.stream.next().await {
@@ -50,10 +44,7 @@ where
     }
 }
 
-impl<R> Shaken<R>
-where
-    R: Rng + Send + Sync + 'static,
-{
+impl Shaken {
     async fn handle(
         &mut self,
         msg: &Privmsg<'static>,
@@ -75,7 +66,7 @@ where
 
     async fn generate(&mut self, context: &str) -> anyhow::Result<Option<String>> {
         if let Some(dur) = self.last {
-            if dur.elapsed() < self.timeout || !self.rng.gen_bool(self.config.ignore_chance) {
+            if dur.elapsed() < self.timeout || self.rng.f64() <= self.config.ignore_chance {
                 return Ok(None);
             }
         }
@@ -96,17 +87,19 @@ where
 
     async fn random_delay(&mut self) {
         let lower = std::cmp::max(self.config.delay_lower, self.config.delay_upper / 10);
-        let upper = self.rng.gen_range(lower, self.config.delay_upper);
-        let range = self.rng.gen_range(self.config.delay_lower, upper);
+        let upper = self.rng.u64(lower..self.config.delay_upper);
+        let range = self.rng.u64(self.config.delay_lower..upper);
         let delay = Duration::from_millis(range);
         async_io::Timer::after(delay).await;
     }
 
     fn choose_context<'a>(&mut self, context: &'a str) -> Option<&'a str> {
-        context
+        let mut choices = context
             .split_whitespace()
             .filter(|&s| filtered_context(s))
-            .choose(&mut self.rng)
+            .collect::<Vec<_>>();
+        self.rng.shuffle(&mut choices);
+        choices.get(0).copied()
     }
 
     async fn fetch_response(host: &str, context: Option<String>) -> anyhow::Result<String> {
