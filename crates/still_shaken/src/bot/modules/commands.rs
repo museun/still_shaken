@@ -60,6 +60,12 @@ impl Commands {
         let elevated = msg.is_broadcaster() || msg.is_moderator();
 
         match (head, arg) {
+            ("set", Some(arg)) if elevated => {
+                // this'll do add or edit
+                self.update_template(msg, responder, arg, body)?;
+                return responder.nothing();
+            }
+
             ("add", Some(arg)) if elevated => {
                 if let Some(ch) = self.channels.get(msg.channel()) {
                     if ch.commands.contains_key(arg) {
