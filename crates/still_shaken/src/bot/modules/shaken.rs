@@ -51,7 +51,7 @@ impl Shaken {
         context: &mut Context,
     ) -> anyhow::Result<()> {
         if msg.data() == "!speak" || msg.is_mentioned(&*context.identity) {
-            let response = Self::fetch_response(&*self.generate, None).await?;
+            let response = Self::fetch_response(&mut self.rng, &*self.generate, None).await?;
             let response = fixup_response(response);
             let _ = context.responder.say(msg, response);
             return Ok(());
@@ -72,7 +72,7 @@ impl Shaken {
         }
 
         let context = self.choose_context(context).map(ToString::to_string);
-        let response = Self::fetch_response(&*self.generate, context).await?;
+        let response = Self::fetch_response(&mut self.rng, &*self.generate, context).await?;
         let response = fixup_response(response);
 
         // random delay
@@ -102,7 +102,11 @@ impl Shaken {
         choices.get(0).copied()
     }
 
-    async fn fetch_response(host: &str, context: Option<String>) -> anyhow::Result<String> {
+    async fn fetch_response(
+        rng: &mut fastrand::Rng,
+        host: &str,
+        context: Option<String>,
+    ) -> anyhow::Result<String> {
         #[derive(Debug, serde::Deserialize)]
         struct Response {
             status: String,
@@ -110,7 +114,7 @@ impl Shaken {
         }
 
         let body = serde_json::json!({
-            "min": 1,
+            "min": rng.u8(1..=3),
             "max": 45,
             "context": &context
         });
