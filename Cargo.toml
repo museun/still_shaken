@@ -2,7 +2,6 @@
 members = [ "crates/*" ]
 
 [patch.crates-io]
-async-tls = { git = "https://github.com/museun/async-tls", branch = "futures-lite" }
 attohttpc = { git = "https://github.com/museun/attohttpc", branch = "museun" }
 
 [profile.release]
