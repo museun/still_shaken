@@ -15,10 +15,8 @@ pub use handler::{AnyhowFut, Callable, Context, Respond};
 mod command;
 pub use command::Command;
 
-mod command_dispatch;
-pub use command_dispatch::{CommandArgs, Commands, StoredCommand};
-
-// mod modules;
+mod commands;
+pub use commands::{CommandArgs, Commands, StoredCommand};
 
 mod state;
 pub use state::State;

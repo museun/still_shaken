@@ -155,15 +155,6 @@ impl Commands {
         self.add_stored(StoredCommand::elevated(this, example, func)?)
     }
 
-    pub fn add_many_stored(
-        &mut self,
-        iter: impl IntoIterator<Item = StoredCommand>,
-    ) -> anyhow::Result<()> {
-        iter.into_iter()
-            .map(|stored| self.add_stored(stored))
-            .collect()
-    }
-
     pub fn add_stored(&mut self, mut stored: StoredCommand) -> anyhow::Result<()> {
         // TODO assert about overridden commands
         let cmd = Arc::new(std::mem::take(&mut stored.cmd));

@@ -1,4 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    hash::Hasher,
+};
 
 use anyhow::Context;
 
@@ -30,10 +34,10 @@ pub struct Command {
     args: Box<[Arg]>,
 }
 
-impl std::hash::Hash for Command {
+impl Hash for Command {
     fn hash<H>(&self, state: &mut H)
     where
-        H: std::hash::Hasher,
+        H: Hasher,
     {
         state.write(self.command.as_bytes());
     }

@@ -1,7 +1,11 @@
 use crate::*;
 use std::{borrow::Cow, sync::Arc};
 
-pub struct Help;
+pub struct Help {
+    commands: Vec<Command>,
+    config: Config,
+}
+
 impl super::Initialize for Help {
     fn initialize(
         config: &Config,
@@ -9,37 +13,24 @@ impl super::Initialize for Help {
         _passives: &mut Passives,
         _executor: &Executor,
     ) -> anyhow::Result<()> {
-        let cmd = Command::example("!help <command?>").build()?;
-        let help = HelpCommand {
-            commands: Arc::new({
-                let mut cmds = vec![cmd.clone()];
-                cmds.extend(commands.commands().cloned());
-                cmds
-            }),
-            config: Arc::new(config.clone()),
-        };
-        commands.add(cmd, move |ctx| help.call(ctx))?;
+        // add the dummy help command show it shows up in itself
+        let mut cmds = vec![Command::example("!help <command?>").build()?];
+        cmds.extend(commands.commands().cloned());
+
+        // and this is the real command
+        let this = Arc::new(Self::new(cmds, config.clone()));
+        commands.command(this, "!help <command?>", Self::handle)?;
 
         Ok(())
     }
 }
 
-#[derive(Clone)]
-struct HelpCommand {
-    commands: Arc<Vec<Command>>,
-    config: Arc<Config>,
-}
-
-impl Callable<CommandArgs> for HelpCommand {
-    type Fut = AnyhowFut<'static>;
-    fn call(&self, state: Context<CommandArgs>) -> Self::Fut {
-        let fut = Self::handle(Box::new(self.clone()), state);
-        Box::pin(fut)
+impl Help {
+    const fn new(commands: Vec<Command>, config: Config) -> Self {
+        Self { commands, config }
     }
-}
 
-impl HelpCommand {
-    async fn handle(self: Box<Self>, context: Context<CommandArgs>) -> anyhow::Result<()> {
+    async fn handle(self: Arc<Self>, context: Context<CommandArgs>) -> anyhow::Result<()> {
         let channel = context.channel();
         match context.args.map.get("command") {
             Some(cmd) => {
@@ -54,7 +45,7 @@ impl HelpCommand {
     }
 
     fn format_commands(&self, channel: &str) -> anyhow::Result<String> {
-        let custom = super::get_commands(&*self.config, channel)?;
+        let custom = super::get_commands(&self.config, channel)?;
 
         let commands = self
             .commands
@@ -78,7 +69,7 @@ impl HelpCommand {
         match self.commands.iter().find(|c| c.name() == search) {
             Some(cmd) => Ok(cmd.help().into()),
             None => {
-                match super::get_commands(&*self.config, channel)?
+                match super::get_commands(&self.config, channel)?
                     .into_iter()
                     .find(|(k, _)| k == search)
                     .map(|(_, v)| v.into())
