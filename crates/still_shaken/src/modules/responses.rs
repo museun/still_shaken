@@ -1,13 +1,25 @@
 use crate::*;
 
-use async_mutex::Mutex;
-
 use error::DontCare;
+use persist::{Persist, Toml};
 use responder::Responder;
+
 use shaken_template::{Environment, SimpleTemplate, Template};
+
+use async_mutex::Mutex;
+use std::{collections::HashMap, sync::Arc};
 use twitchchat::messages::Privmsg;
 
-use std::{collections::HashMap, sync::Arc};
+/// This is used to get the command from other modules
+pub fn get_commands(config: &Config, channel: &str) -> anyhow::Result<Vec<(String, String)>> {
+    data::load_saved(&config.modules.commands.commands_file).map(|saved| {
+        saved
+            .channels
+            .get(channel)
+            .map(|channel| channel.commands.clone().into_iter().collect())
+            .unwrap_or_default()
+    })
+}
 
 pub struct Responses {
     config: config::Commands,
@@ -140,28 +152,6 @@ impl Responses {
         }
     }
 
-    async fn sync_commands(&self) -> anyhow::Result<()> {
-        let channels = self.channels.lock().await;
-        let channels = channels.iter().map(|(k, v)| {
-            let channel = data::Channel {
-                commands: v
-                    .commands
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.body().to_string()))
-                    .collect(),
-            };
-            (k.to_string(), channel)
-        });
-
-        let saved = data::Saved {
-            channels: channels.collect(),
-        };
-
-        let s = toml::to_string_pretty(&saved)?;
-        std::fs::write(&self.config.commands_file, &s)?;
-        Ok(())
-    }
-
     async fn update_template(
         &self,
         msg: &Privmsg<'_>,
@@ -169,7 +159,7 @@ impl Responses {
         cmd: &str,
         body: Option<&str>,
     ) -> anyhow::Result<()> {
-        let body = match body {
+        let body = match body.map(str::trim).filter(|s| !s.is_empty()) {
             Some(body) => body,
             None => return responder.reply(msg, "try again. you provided an empty command body"),
         };
@@ -193,8 +183,27 @@ impl Responses {
             .or_default()
             .add_template(cmd, SimpleTemplate::new(cmd, body));
 
-        self.sync_commands().await?;
-        Ok(())
+        self.sync_commands().await
+    }
+
+    async fn sync_commands(&self) -> anyhow::Result<()> {
+        let channels = self.channels.lock().await;
+        let channels = channels.iter().map(|(k, v)| {
+            let channel = data::Channel {
+                commands: v
+                    .commands
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.body().to_string()))
+                    .collect(),
+            };
+            (k.to_string(), channel)
+        });
+
+        let saved = data::Saved {
+            channels: channels.collect(),
+        };
+
+        Toml::save(&self.config.commands_file, &saved)
     }
 }
 
@@ -222,13 +231,14 @@ impl Channel {
             let t: Box<dyn Template> = Box::new(t);
             (k, t)
         });
-        Self {
-            commands: commands.collect(),
-        }
+
+        let commands = commands.collect();
+        Self { commands }
     }
 }
 
 mod data {
+    use crate::persist::{Persist, Toml};
     use std::collections::HashMap;
 
     #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -243,18 +253,6 @@ mod data {
     }
 
     pub fn load_saved(file: &str) -> anyhow::Result<Saved> {
-        let s = std::fs::read_to_string(file)?;
-        let t = toml::from_str(&s)?;
-        Ok(t)
+        Toml::load_from(file)
     }
-}
-
-pub fn get_commands(config: &Config, channel: &str) -> anyhow::Result<Vec<(String, String)>> {
-    let saved = data::load_saved(&config.modules.commands.commands_file)?;
-
-    Ok(saved
-        .channels
-        .get(channel)
-        .map(|channel| channel.commands.clone().into_iter().collect())
-        .unwrap_or_default())
 }
