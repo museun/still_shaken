@@ -1,7 +1,11 @@
 use std::{pin::Pin, task::Context, task::Poll};
 
 use futures_lite::Future;
-use twitchchat::{messages::Privmsg, runner::Identity};
+use twitchchat::{
+    messages::Privmsg,
+    runner::Identity,
+    twitch::{Badge, BadgeKind},
+};
 
 #[macro_export]
 macro_rules! into_iter {
@@ -84,6 +88,7 @@ pub fn shrink_string(s: &str, max: usize) -> &str {
 pub trait PrivmsgExt {
     fn is_mentioned(&self, identity: &Identity) -> bool;
     fn user_name(&self) -> &str;
+    fn is_above_user_level(&self) -> bool;
 }
 
 impl<'a> PrivmsgExt for Privmsg<'a> {
@@ -102,6 +107,21 @@ impl<'a> PrivmsgExt for Privmsg<'a> {
     }
     fn user_name(&self) -> &str {
         self.display_name().unwrap_or_else(|| self.name())
+    }
+
+    fn is_above_user_level(&self) -> bool {
+        use BadgeKind::*;
+        self.tags()
+            .get("badges")
+            .map(|badges| {
+                badges
+                    .split(',')
+                    .flat_map(Badge::parse)
+                    .fold(false, |ok, badge| {
+                        ok | matches!(badge.kind, Broadcaster | Moderator | VIP)
+                    })
+            })
+            .unwrap_or(false)
     }
 }
 

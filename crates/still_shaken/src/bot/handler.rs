@@ -78,13 +78,47 @@ impl<A> Context<A> {
     }
 }
 
-impl Context<Privmsg<'static>> {
-    // pub fn parts(&self) {}
-    // pub fn command(&self) {}
+pub trait Respond {
+    fn msg(&self) -> &Privmsg<'static>;
+    fn responder(&self) -> &Responder;
+
+    fn say<R>(&self, resp: R) -> anyhow::Result<()>
+    where
+        R: Into<String>,
+    {
+        self.responder().say(self.msg(), resp)
+    }
+
+    fn reply<R>(&self, resp: R) -> anyhow::Result<()>
+    where
+        R: Into<String>,
+    {
+        self.responder().reply(self.msg(), resp)
+    }
+}
+
+impl Respond for Context<Privmsg<'static>> {
+    fn msg(&self) -> &Privmsg<'static> {
+        &*self.args
+    }
+
+    fn responder(&self) -> &Responder {
+        &self.state.responder
+    }
+}
+
+impl Respond for Context<CommandArgs> {
+    fn msg(&self) -> &Privmsg<'static> {
+        &*self.args.msg
+    }
+
+    fn responder(&self) -> &Responder {
+        &self.state.responder
+    }
 }
 
 impl Context<CommandArgs> {
     pub fn channel(&self) -> &str {
-        self.args.msg.channel()
+        self.msg().channel()
     }
 }

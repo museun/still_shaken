@@ -16,16 +16,15 @@ pub fn initialize(
     .collect()
 }
 
-async fn handle(context: Context<CommandArgs>) -> anyhow::Result<()> {
-    let msg = &*context.args.msg;
-    let input = &context.args.map["crate"];
+async fn handle(ctx: Context<CommandArgs>) -> anyhow::Result<()> {
+    let input = &ctx.args.map["crate"];
 
     let mut crates = match lookup(&*input).await {
         Ok(crates) => crates,
         Err(err) => {
             log::error!("cannot lookup crate: {}", err);
             let resp = "I cannot do a lookup on crates.io :(";
-            return context.responder().reply(msg, resp);
+            return ctx.reply(resp);
         }
     };
 
@@ -33,7 +32,7 @@ async fn handle(context: Context<CommandArgs>) -> anyhow::Result<()> {
         Some(c) => c,
         None => {
             let resp = format!("I cannot find anything for '{}'", input);
-            return context.responder().reply(msg, resp);
+            return ctx.reply(resp);
         }
     };
 
@@ -41,21 +40,18 @@ async fn handle(context: Context<CommandArgs>) -> anyhow::Result<()> {
     if let Some(description) = c.description {
         fixup_description(&mut out, description);
     }
-    context.responder().say(msg, out)?;
+    ctx.say(out)?;
 
     if let Some(repo) = c.repository {
         let out = format!("repository: {}", repo);
-        context.responder().say(msg, out)?;
+        ctx.say(out)?;
     }
 
-    context.responder().say(
-        msg,
-        format!(
-            "documentation: https://docs.rs/{name}/{version}/{name}",
-            name = c.name,
-            version = c.max_version
-        ),
-    )
+    ctx.say(format!(
+        "documentation: https://docs.rs/{name}/{version}/{name}",
+        name = c.name,
+        version = c.max_version
+    ))
 }
 
 fn fixup_description(out: &mut String, desc: String) {

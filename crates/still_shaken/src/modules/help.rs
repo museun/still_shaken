@@ -42,11 +42,11 @@ impl HelpCommand {
         match context.args.map.get("command") {
             Some(cmd) => {
                 let command = self.lookup(cmd, channel)?;
-                context.responder().reply(&*context.args.msg, command)
+                context.reply(command)
             }
             None => {
                 let commands = self.format_commands(channel)?;
-                context.responder().say(&*context.args.msg, &*commands)
+                context.say(&*commands)
             }
         }
     }

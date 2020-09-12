@@ -47,20 +47,20 @@ impl Shaken {
     async fn speak(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
         let response = Self::fetch_response(&*self.generate, None).await?;
         let response = fixup_response(response);
-        ctx.responder().say(&*ctx.args.msg, response)
+        ctx.say(response)
     }
 
     async fn handle(self: Arc<Self>, ctx: Context<Privmsg<'static>>) -> anyhow::Result<()> {
         if ctx.args.is_mentioned(&*ctx.state.identity) {
             let response = Self::fetch_response(&*self.generate, None).await?;
             let response = fixup_response(response);
-            return ctx.responder().say(&*ctx.args, response);
+            return ctx.say(response);
         }
 
         // let everything else run before this
         async_io::Timer::after(std::time::Duration::from_secs(1)).await;
         let data = self.generate(ctx.args.data()).await?.dont_care()?;
-        ctx.responder().say(&*ctx.args, data)
+        ctx.say(data)
     }
 
     async fn generate(self: Arc<Self>, context: &str) -> anyhow::Result<Option<String>> {

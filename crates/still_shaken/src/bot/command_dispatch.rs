@@ -1,5 +1,5 @@
-use super::{command::ExtractResult, handler::AnyhowFut, Callable, Command};
-use crate::Context;
+use super::{command::ExtractResult, handler::AnyhowFut, Callable, Command, Respond};
+use crate::{util::PrivmsgExt, Context};
 
 use std::{collections::HashMap, future::Future, sync::Arc};
 use twitchchat::messages::Privmsg;
@@ -157,16 +157,14 @@ impl Callable<Privmsg<'static>> for CommandDispatch {
             let map = match k.extract(state.args.data()) {
                 ExtractResult::Found(map) => map,
                 ExtractResult::Required => {
-                    let _ = state.responder().reply(&*state.args, k.help());
+                    let _ = state.reply(k.help());
                     continue;
                 }
                 ExtractResult::NoMatch => continue,
             };
 
-            if !k.is_level_met(&*state.args) {
-                return Box::pin(async move {
-                    state.responder().reply(&*state.args, "you cannot do that")
-                });
+            if k.requires_elevated() && !state.args.is_above_user_level() {
+                return Box::pin(async move { state.reply("you cannot do that") });
             }
 
             let map = map.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
@@ -199,29 +197,25 @@ mod tests {
             let mut dispatch = CommandDispatch::default();
             dispatch
                 .add(hello, |ctx: Context<CommandArgs>| async move {
-                    ctx.responder()
-                        .say(&*ctx.args.msg, format!("hello {}", ctx.args.msg.name()))
+                    ctx.say(format!("hello {}", ctx.args.msg.name()))
                 })
                 .unwrap();
             dispatch
                 .add(repeat_this, |ctx: Context<CommandArgs>| async move {
-                    ctx.responder()
-                        .say(&*ctx.args.msg, format!("ok: {}", ctx.args.map["this"]))
+                    ctx.say(format!("ok: {}", ctx.args.map["this"]))
                 })
                 .unwrap();
             dispatch
                 .add(maybe, |ctx: Context<CommandArgs>| async move {
                     match ctx.args.map.get("something") {
-                        Some(data) => ctx
-                            .responder()
-                            .say(&*ctx.args.msg, format!("just: {}", data)),
-                        None => ctx.responder().say(&*ctx.args.msg, "nothing"),
+                        Some(data) => ctx.say(format!("just: {}", data)),
+                        None => ctx.say("nothing"),
                     }
                 })
                 .unwrap();
             dispatch
                 .add(elevated, |ctx: Context<CommandArgs>| async move {
-                    ctx.responder().reply(&*ctx.args.msg, "shutting down")
+                    ctx.reply("shutting down")
                 })
                 .unwrap();
 

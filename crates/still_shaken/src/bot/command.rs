@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
-use twitchchat::messages::Privmsg;
 
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 enum ArgType {
@@ -77,23 +76,8 @@ impl Command {
         &*self.help
     }
 
-    pub fn is_level_met(&self, msg: &Privmsg<'_>) -> bool {
-        if !self.elevated {
-            return true;
-        }
-
-        let badges = match msg.tags().get("badges") {
-            Some(badges) => badges,
-            None => return false,
-        };
-
-        use twitchchat::twitch::{Badge, BadgeKind::*};
-        badges
-            .split(',')
-            .flat_map(Badge::parse)
-            .fold(false, |ok, badge| {
-                ok | matches!(badge.kind, Broadcaster | Moderator | VIP)
-            })
+    pub const fn requires_elevated(&self) -> bool {
+        self.elevated
     }
 
     pub fn extract<'a, 'b>(&'a self, mut input: &'b str) -> ExtractResult<'a, 'b> {

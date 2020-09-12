@@ -83,7 +83,7 @@ impl Commands {
             .insert("name", ctx.args.user_name().to_string())
             .insert("channel", ctx.args.channel().to_string());
         let resp = template.apply(&env);
-        ctx.responder().say(&*ctx.args, resp)
+        ctx.say(resp)
     }
 
     async fn set_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
@@ -101,9 +101,7 @@ impl Commands {
 
         if let Some(ch) = self.channels.lock().await.get(ctx.channel()) {
             if ch.commands.contains_key(&*cmd) {
-                return ctx
-                    .responder()
-                    .reply(&*ctx.args.msg, format!("'{}' already exists", cmd));
+                return ctx.reply(format!("'{}' already exists", cmd));
             }
         }
 
@@ -120,9 +118,7 @@ impl Commands {
             let channels = self.channels.lock().await;
             let ch = channels.get(ctx.channel());
             if ch.is_none() || !ch.unwrap().commands.contains_key(&*cmd) {
-                return ctx
-                    .responder()
-                    .reply(&*ctx.args.msg, format!("'{}' does not exist", cmd));
+                return ctx.reply(format!("'{}' does not exist", cmd));
             }
         }
 
@@ -145,7 +141,7 @@ impl Commands {
             None => format!("'{}' does not exist", cmd),
         };
 
-        ctx.responder().reply(&*ctx.args.msg, out)
+        ctx.reply(out)
     }
 }
 
