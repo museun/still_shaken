@@ -1,7 +1,11 @@
-use super::{handler::Callable, handler::Context, handler::ContextState, state::State};
-use crate::{error::DontCareSigil, responder::Responder, Executor};
+use crate::*;
 
-use std::{borrow::Cow, collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use async_mutex::Mutex;
 use futures_lite::StreamExt;
@@ -16,13 +20,13 @@ pub struct TestRunner {
 }
 
 impl TestRunner {
-    pub fn new(data: impl Display) -> Self {
+    pub fn new(data: impl Into<String>) -> Self {
         Self {
             msg: Self::build_msg(
                 "@id=00000000-0000-0000-0000-000000000000",
                 "test_user",
                 "#test_channel",
-                &data.to_string(),
+                &data.into(),
             ),
             state: State::default(),
             output: Vec::new(),
@@ -117,7 +121,7 @@ impl TestRunner {
     {
         let (tx, mut rx) = async_channel::unbounded();
 
-        let responder = Responder::new(tx);
+        let responder = crate::responder::Responder::new(tx);
         let state = Arc::new(Mutex::new(self.state));
 
         let executor = Executor::new(1);
@@ -134,7 +138,7 @@ impl TestRunner {
             },
         });
 
-        let state = ContextState {
+        let state = super::handler::ContextState {
             responder,
             state,
             identity,
@@ -148,7 +152,7 @@ impl TestRunner {
 
         futures_lite::future::block_on(async move {
             match handler.call(context).await {
-                Err(err) if err.is::<DontCareSigil>() => {}
+                Err(err) if err.is::<crate::error::DontCareSigil>() => {}
                 Err(err) => panic!("{}", err),
                 Ok(..) => {}
             }

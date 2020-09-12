@@ -22,4 +22,5 @@ mod state;
 pub use state::State;
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod test;

@@ -17,6 +17,7 @@ where
     fn save<P: AsRef<Path>>(path: P, element: &T) -> anyhow::Result<()>;
 }
 
+#[allow(dead_code)]
 pub struct Json;
 
 impl<T> Persist<T> for Json
