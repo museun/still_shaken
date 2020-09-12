@@ -197,25 +197,33 @@ mod tests {
             let elevated = Command::example("!shutdown").elevated().build().unwrap();
 
             let mut dispatch = CommandDispatch::default();
-            dispatch.add(hello, |ctx: Context<CommandArgs>| async move {
-                ctx.responder()
-                    .say(&*ctx.args.msg, format!("hello {}", ctx.args.msg.name()))
-            });
-            dispatch.add(repeat_this, |ctx: Context<CommandArgs>| async move {
-                ctx.responder()
-                    .say(&*ctx.args.msg, format!("ok: {}", ctx.args.map["this"]))
-            });
-            dispatch.add(maybe, |ctx: Context<CommandArgs>| async move {
-                match ctx.args.map.get("something") {
-                    Some(data) => ctx
-                        .responder()
-                        .say(&*ctx.args.msg, format!("just: {}", data)),
-                    None => ctx.responder().say(&*ctx.args.msg, "nothing"),
-                }
-            });
-            dispatch.add(elevated, |ctx: Context<CommandArgs>| async move {
-                ctx.responder().reply(&*ctx.args.msg, "shutting down")
-            });
+            dispatch
+                .add(hello, |ctx: Context<CommandArgs>| async move {
+                    ctx.responder()
+                        .say(&*ctx.args.msg, format!("hello {}", ctx.args.msg.name()))
+                })
+                .unwrap();
+            dispatch
+                .add(repeat_this, |ctx: Context<CommandArgs>| async move {
+                    ctx.responder()
+                        .say(&*ctx.args.msg, format!("ok: {}", ctx.args.map["this"]))
+                })
+                .unwrap();
+            dispatch
+                .add(maybe, |ctx: Context<CommandArgs>| async move {
+                    match ctx.args.map.get("something") {
+                        Some(data) => ctx
+                            .responder()
+                            .say(&*ctx.args.msg, format!("just: {}", data)),
+                        None => ctx.responder().say(&*ctx.args.msg, "nothing"),
+                    }
+                })
+                .unwrap();
+            dispatch
+                .add(elevated, |ctx: Context<CommandArgs>| async move {
+                    ctx.responder().reply(&*ctx.args.msg, "shutting down")
+                })
+                .unwrap();
 
             dispatch
         }
