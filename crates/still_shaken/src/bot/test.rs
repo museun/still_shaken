@@ -1,0 +1,270 @@
+use super::{handler::Callable, handler::Context, handler::ContextState, state::State};
+use crate::{error::DontCareSigil, responder::Responder, Executor};
+
+use std::{borrow::Cow, collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
+
+use async_mutex::Mutex;
+use futures_lite::StreamExt;
+use twitchchat::{
+    messages::Privmsg, runner::Capabilities, runner::Identity, FromIrcMessage, IntoOwned,
+};
+
+pub struct TestRunner {
+    state: State,
+    msg: Privmsg<'static>,
+    output: Vec<String>,
+}
+
+impl TestRunner {
+    pub fn new(data: impl Display) -> Self {
+        Self {
+            msg: Self::build_msg(
+                "@id=00000000-0000-0000-0000-000000000000",
+                "test_user",
+                "#test_channel",
+                &data.to_string(),
+            ),
+            state: State::default(),
+            output: Vec::new(),
+        }
+    }
+
+    pub fn with_channel(mut self, channel: impl Into<String>) -> Self {
+        self.msg = Self::build_msg(
+            self.msg.tags().raw_tags(),
+            self.msg.name(),
+            &channel.into(),
+            self.msg.data(),
+        );
+        self
+    }
+
+    pub fn with_user(mut self, user: impl Into<String>) -> Self {
+        self.msg = Self::build_msg(
+            self.msg.tags().raw_tags(),
+            &user.into(),
+            self.msg.channel(),
+            self.msg.data(),
+        );
+        self
+    }
+
+    pub fn with_data(mut self, data: impl Into<String>) -> Self {
+        self.msg = Self::build_msg(
+            self.msg.tags().raw_tags(),
+            self.msg.name(),
+            self.msg.channel(),
+            &data.into(),
+        );
+        self
+    }
+
+    pub fn with_broadcaster(self, user: impl Into<String>) -> Self {
+        self.with_badge("broadcaster").with_user(user)
+    }
+
+    pub fn with_moderator(self, user: impl Into<String>) -> Self {
+        self.with_badge("moderator").with_user(user)
+    }
+
+    pub fn with_vip(self, user: impl Into<String>) -> Self {
+        self.with_badge("vip").with_user(user)
+    }
+
+    pub fn with_badge(mut self, badge: &str) -> Self {
+        let tags = TagsBuilder::default()
+            .merge_with(self.msg.tags().raw_tags())
+            .add("badges", format!("{}/1", badge))
+            .build();
+
+        self.msg = Self::build_msg(&tags, self.msg.name(), self.msg.channel(), self.msg.data());
+        self
+    }
+
+    pub fn reply(mut self, data: impl Display) -> Self {
+        let tags = "@reply-parent-msg-id=00000000-0000-0000-0000-000000000000";
+        let msg = format!(
+            "{tags} PRIVMSG {channel} :{data}\r\n",
+            channel = self.msg.channel(),
+            data = data,
+            tags = tags,
+        );
+        self.output.push(msg);
+        self
+    }
+
+    pub fn say(mut self, data: impl Display) -> Self {
+        let msg = format!(
+            "PRIVMSG {channel} :{data}\r\n",
+            channel = self.msg.channel(),
+            data = data
+        );
+        self.output.push(msg);
+        self
+    }
+
+    pub fn insert<T>(mut self, object: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        self.state.insert(object).unwrap();
+        self
+    }
+
+    pub fn run<H>(self, handler: H) -> H
+    where
+        H: Callable<Privmsg<'static>>,
+    {
+        let (tx, mut rx) = async_channel::unbounded();
+
+        let responder = Responder::new(tx);
+        let state = Arc::new(Mutex::new(self.state));
+
+        let executor = Executor::new(1);
+        let identity = Arc::new(Identity::Full {
+            name: "shaken_bot".into(),
+            user_id: 241015868,
+            display_name: Some("shaken_bot".into()),
+            color: "#FF00FF".parse().unwrap(),
+            caps: Capabilities {
+                membership: false,
+                commands: false,
+                tags: true,
+                unknown: <_>::default(),
+            },
+        });
+
+        let state = ContextState {
+            responder,
+            state,
+            identity,
+            executor,
+        };
+
+        let context = Context::new(self.msg, Arc::new(state));
+
+        let mut responses = self.output;
+        responses.reverse();
+
+        futures_lite::future::block_on(async move {
+            match handler.call(context).await {
+                Err(err) if err.is::<DontCareSigil>() => {}
+                Err(err) => panic!("{}", err),
+                Ok(..) => {}
+            }
+
+            let len = responses.len();
+            while let Some(msg) = rx.next().await {
+                // TODO not like this
+                // TODO read above
+                let msg = msg.to_string();
+                let resp = match responses.pop() {
+                    Some(resp) => resp,
+                    None => panic!("a response was expected for:\n'{}'", msg.escape_debug()),
+                };
+                assert_eq!(resp, msg)
+            }
+
+            assert!(
+                responses.is_empty(),
+                "some responses remain:\n{pad:->40}\n{}\n{pad:->40}",
+                responses
+                    .iter()
+                    .enumerate()
+                    .fold(String::new(), |mut a, (i, c)| {
+                        if !a.is_empty() {
+                            a.push('\n');
+                        }
+                        a.push_str(&format!("#{}/{}: ", len - i, len));
+                        a.push_str(&format!("{}: ", c.escape_debug()));
+                        a
+                    }),
+                pad = ""
+            );
+
+            handler
+        })
+    }
+
+    fn build_msg(tags: &str, name: &str, channel: &str, data: &str) -> Privmsg<'static> {
+        assert!(!name.is_empty());
+        assert!(!channel.is_empty());
+        assert!(!data.is_empty());
+
+        let raw = if tags.is_empty() {
+            format!(
+                ":{name}!{name}@{name} PRIVMSG {channel} :{data}\r\n",
+                name = name,
+                channel = channel,
+                data = data
+            )
+        } else {
+            format!(
+                "{tags} :{name}!{name}@{name} PRIVMSG {channel} :{data}\r\n",
+                tags = tags,
+                name = name,
+                channel = channel,
+                data = data
+            )
+        };
+
+        let irc = twitchchat::irc::parse(&raw).next().unwrap().unwrap();
+        Privmsg::from_irc(irc).unwrap().into_owned()
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct TagsBuilder<'a> {
+    map: HashMap<Cow<'a, str>, Cow<'a, str>>,
+}
+
+impl<'a> TagsBuilder<'a> {
+    pub fn add(mut self, key: impl Into<Cow<'a, str>>, value: impl Into<Cow<'a, str>>) -> Self {
+        self.map.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn merge_with(mut self, mut raw: &'a str) -> Self {
+        raw = &raw[..raw.find(' ').unwrap()];
+        while raw.starts_with('@') {
+            raw = &raw[1..]
+        }
+
+        let iter = raw
+            .split_terminator(';')
+            .filter_map(|c| {
+                let mut t = c.split('=');
+                Some((t.next()?, t.next()?))
+            })
+            .map(|(k, v)| (Cow::from(k), Cow::from(v)));
+
+        self.map.extend(iter);
+        self
+    }
+
+    pub fn build(self) -> String {
+        let mut cap = self
+            .map
+            .iter()
+            .map(|(k, v)| (k.len() + v.len()))
+            .sum::<usize>();
+
+        // add the @ and all of the = and ;
+        cap += 1 + self.map.len() * 2;
+
+        self.map
+            .into_iter()
+            .fold(String::with_capacity(cap), |mut a, (k, v)| {
+                if !a.is_empty() {
+                    a.push(';');
+                } else {
+                    a.push('@');
+                }
+
+                a.push_str(&*k);
+                a.push('=');
+                a.push_str(&*v);
+                a
+            })
+    }
+}

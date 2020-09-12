@@ -1,32 +1,31 @@
-use super::{dont_care, Context, DontCare};
-use crate::util::shrink_string;
+use crate::*;
 
-use futures_lite::StreamExt;
-use twitchchat::messages::Privmsg;
-
-pub async fn lookup_crate(mut context: Context) {
-    while let Some(msg) = context.stream.next().await {
-        let err = handle(&msg, &mut context).await;
-        if let Some(err) = crate::error::is_real_error(err) {
-            log::error!("{}", err);
-        }
-    }
+pub fn initialize(
+    _config: &Config,
+    commands: &mut CommandDispatch,
+    _passives: &mut Passives,
+    _executor: &Executor,
+) -> anyhow::Result<()> {
+    [
+        "!crate <crate>",  // main command
+        "!crates <crate>", // aliases
+        "!lookup <crate>", // aliases
+    ]
+    .iter()
+    .map(|cmd| commands.add(Command::example(cmd).build()?, handle))
+    .collect()
 }
 
-async fn handle(msg: &Privmsg<'_>, context: &mut Context) -> anyhow::Result<()> {
-    let mut iter = msg.data().splitn(2, char::is_whitespace);
+async fn handle(context: Context<CommandArgs>) -> anyhow::Result<()> {
+    let msg = &*context.args.msg;
+    let input = &context.args.map["crate"];
 
-    let input = match iter.next().dont_care()? {
-        "!crate" | "!crates" | "!lookup" => iter.next().dont_care()?,
-        _ => really_dont_care!(),
-    };
-
-    let mut crates = match lookup(input).await {
+    let mut crates = match lookup(&*input).await {
         Ok(crates) => crates,
         Err(err) => {
             log::error!("cannot lookup crate: {}", err);
             let resp = "I cannot do a lookup on crates.io :(";
-            return context.responder.reply(msg, resp);
+            return context.responder().reply(msg, resp);
         }
     };
 
@@ -34,7 +33,7 @@ async fn handle(msg: &Privmsg<'_>, context: &mut Context) -> anyhow::Result<()> 
         Some(c) => c,
         None => {
             let resp = format!("I cannot find anything for '{}'", input);
-            return context.responder.reply(msg, resp);
+            return context.responder().reply(msg, resp);
         }
     };
 
@@ -42,14 +41,21 @@ async fn handle(msg: &Privmsg<'_>, context: &mut Context) -> anyhow::Result<()> 
     if let Some(description) = c.description {
         fixup_description(&mut out, description);
     }
-    context.responder.say(msg, out)?;
+    context.responder().say(msg, out)?;
 
     if let Some(repo) = c.repository {
         let out = format!("repository: {}", repo);
-        return context.responder.say(msg, out);
+        context.responder().say(msg, out)?;
     }
 
-    dont_care()
+    context.responder().say(
+        msg,
+        format!(
+            "documentation: https://docs.rs/{name}/{version}/{name}",
+            name = c.name,
+            version = c.max_version
+        ),
+    )
 }
 
 fn fixup_description(out: &mut String, desc: String) {
@@ -62,7 +68,7 @@ fn fixup_description(out: &mut String, desc: String) {
     });
 
     out.push_str(" | ");
-    out.push_str(shrink_string(&*s, 400));
+    out.push_str(crate::util::shrink_string(&*s, 400));
 }
 
 #[derive(serde::Deserialize)]

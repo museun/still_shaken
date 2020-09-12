@@ -3,6 +3,51 @@ use std::{pin::Pin, task::Context, task::Poll};
 use futures_lite::Future;
 use twitchchat::{messages::Privmsg, runner::Identity};
 
+#[macro_export]
+macro_rules! into_iter {
+    ($head:expr) => {
+        std::iter::once($head)
+    };
+
+    ($head:expr, $($expr:expr),* $(,)?) => {
+        into_iter!($head)$(.chain(into_iter!($expr)))*
+    };
+}
+
+pub fn type_name<T>() -> &'static str {
+    fn trim(input: &str) -> &str {
+        let mut n = input.len();
+        let left = input
+            .chars()
+            .take_while(|&c| {
+                if c == '<' {
+                    n -= 1;
+                }
+                !c.is_ascii_uppercase()
+            })
+            .count();
+        &input[left..n]
+    }
+
+    let mut input = std::any::type_name::<T>();
+
+    let original = input;
+    loop {
+        let start = input.len();
+        input = trim(input);
+
+        if input.contains('<') {
+            input = trim(&input[1..])
+        }
+
+        match input.len() {
+            0 => break original,
+            d if d == start => break input,
+            _ => {}
+        }
+    }
+}
+
 pub trait InspectErr<E> {
     fn inspect_err<F: Fn(&E)>(self, inspect: F) -> Self;
 }
@@ -112,7 +157,7 @@ impl<L, R> std::fmt::Debug for Select<L, R> {
 }
 
 impl<L, R> Select<L, R> {
-    fn new(left: L, right: R, biased: bool) -> Self {
+    const fn new(left: L, right: R, biased: bool) -> Self {
         Self {
             left,
             right,

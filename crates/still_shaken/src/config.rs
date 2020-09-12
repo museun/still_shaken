@@ -1,22 +1,22 @@
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct Config {
     pub identity: Identity,
     pub modules: Modules,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct Identity {
     pub name: String,
     pub channels: Vec<String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct Modules {
     pub shaken: Shaken,
     pub commands: Commands,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct Shaken {
     pub host: String,
     pub timeout: u64,
@@ -25,7 +25,7 @@ pub struct Shaken {
     pub ignore_chance: f64,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct Commands {
     pub commands_file: String,
 }

@@ -1,11 +1,55 @@
-use super::{Config, Executor, Responder, Response};
+use crate::error::DontCareSigil;
 
+use super::{
+    handler::{AnyhowFut, Callable, Context, ContextState},
+    Config, Executor, Responder, Response, State,
+};
+
+use async_mutex::Mutex;
 use futures_lite::StreamExt;
-use twitchchat::{messages::Commands as TwitchCommands, Status};
+use std::sync::Arc;
+use twitchchat::{messages::Commands as TwitchCommands, messages::Privmsg, Status};
+
+pub type ActiveCallable = dyn Callable<Privmsg<'static>, Fut = AnyhowFut<'static>>;
+
+pub struct Passives {
+    executor: Executor,
+    callables: Vec<Box<ActiveCallable>>,
+}
+
+impl Passives {
+    pub fn new(executor: Executor) -> Self {
+        Self {
+            executor,
+            callables: Vec::new(),
+        }
+    }
+
+    pub fn add<H, F>(&mut self, callable: H)
+    where
+        H: Callable<Privmsg<'static>, Fut = F> + 'static,
+        F: std::future::Future<Output = anyhow::Result<()>> + Send + 'static,
+    {
+        self.callables.push(Box::new(move |ctx| callable.call(ctx)));
+    }
+}
+
+impl Callable<Privmsg<'static>> for Passives {
+    type Fut = AnyhowFut<'static>;
+
+    fn call(&self, state: Context<Privmsg<'static>>) -> Self::Fut {
+        // TODO don't just leak these
+        self.callables
+            .iter()
+            .for_each(|callable| self.executor.spawn(callable.call(state.clone())).detach());
+        Box::pin(async move { Ok(()) })
+    }
+}
 
 pub struct Runner {
     config: Config,
     runner: twitchchat::AsyncRunner,
+    state: Arc<Mutex<State>>,
 }
 
 impl Runner {
@@ -19,11 +63,15 @@ impl Runner {
             .enable_all_capabilities()
             .build()?;
 
-        log::info!("connecting to Twitch");
+        log::info!("connecting to Twitch...");
         twitchchat::AsyncRunner::connect(connector, &user_config)
             .await
             .map_err(Into::into)
-            .map(|runner| Self { config, runner })
+            .map(|runner| Self {
+                config,
+                runner,
+                state: <_>::default(),
+            })
     }
 
     pub async fn join_channels(&mut self) -> anyhow::Result<()> {
@@ -44,33 +92,41 @@ impl Runner {
 
     pub async fn run_to_completion(
         mut self,
-        rng: fastrand::Rng,
+        actives: Vec<Box<ActiveCallable>>,
         executor: Executor,
     ) -> anyhow::Result<()> {
         let responder = Self::create_responder(self.runner.writer(), &executor);
-        let mut tasks = super::modules::create_tasks(
-            &self.config,
+        let identity = Arc::new(self.runner.identity.clone());
+
+        let context_state = Arc::new(ContextState {
             responder,
-            self.runner.identity.clone(),
-            executor,
-            rng,
-        );
+            identity,
+            state: self.state.clone(),
+            executor: executor.clone(),
+        });
 
         loop {
             match self.runner.next_message().await? {
                 Status::Message(TwitchCommands::Privmsg(msg)) => {
-                    tasks.send_all(msg);
+                    let args = Context::new(msg.clone(), context_state.clone());
+                    for active in &actives {
+                        let fut = active.call(args.clone());
+                        executor
+                            .spawn(async move {
+                                if let Err(err) = fut.await {
+                                    if !err.is::<DontCareSigil>() {
+                                        log::error!("error: {}", err)
+                                    }
+                                }
+                            })
+                            .detach();
+                    }
                 }
-
                 Status::Quit => break,
-
-                // TODO reconnect if EOF
                 Status::Eof => break,
                 _ => continue,
             }
         }
-
-        tasks.cancel_remaining().await;
 
         Ok(())
     }

@@ -27,7 +27,7 @@ where
     T: DisplayFn,
 {
     fn display(&self) -> String {
-        self.as_ref().map(|s| s.display()).unwrap_or_default()
+        self.as_ref().map(T::display).unwrap_or_default()
     }
 }
 

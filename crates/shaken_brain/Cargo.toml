@@ -9,7 +9,7 @@ alto_logger = "0.3.7"
 anyhow      = "1.0.32"
 log         = "0.4.11"
 rand        = { version = "0.7.3", features = ["small_rng"] }
-serde       = { version = "1.0.115", features = ["derive"] }
+serde       = { version = "1.0.116", features = ["derive"] }
 serde_json  = "1.0.57"
 tiny_http   = "0.7.0"
 

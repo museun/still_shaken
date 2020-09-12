@@ -1,5 +1,5 @@
 use std::io::{Result, Write};
-use twitchchat::{commands, messages::Privmsg};
+use twitchchat::{commands, messages::Privmsg, Encodable};
 
 use async_channel::Sender;
 
@@ -51,6 +51,14 @@ impl Responder {
 pub enum Response {
     Reply(Reply),
     Say(Say),
+}
+
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buf = Vec::new();
+        self.encode(&mut buf).unwrap();
+        f.write_str(std::str::from_utf8(&buf).unwrap())
+    }
 }
 
 #[derive(Debug)]
