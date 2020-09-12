@@ -15,7 +15,6 @@ mod config;
 use config::Config;
 
 mod responder;
-mod template;
 
 mod format;
 mod http;

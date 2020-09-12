@@ -1,13 +1,10 @@
-use crate::{
-    template::{SimpleTemplate, Template},
-    *,
-};
+use crate::*;
 
 use async_mutex::Mutex;
 
 use error::DontCare;
 use responder::Responder;
-use template::Environment;
+use shaken_template::{Environment, SimpleTemplate, Template};
 use twitchchat::messages::Privmsg;
 
 use std::{collections::HashMap, sync::Arc};
@@ -63,7 +60,7 @@ impl Responses {
             .insert("name", &name)
             .insert("channel", &channel);
 
-        ctx.say(template.apply(&env))
+        ctx.say(template.apply(&env)?)
     }
 
     async fn set_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {

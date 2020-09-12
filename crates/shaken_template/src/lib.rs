@@ -1,10 +1,47 @@
 use std::{collections::HashMap, fmt::Display};
 
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    NestedTemplates,
+    NonTerminated,
+    EmptyTemplate,
+    Custom(Box<dyn std::error::Error + Send + Sync + 'static>),
+}
+
+impl Error {
+    pub fn custom(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Custom(Box::new(err))
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NestedTemplates => f.write_str("nested templates are not allowed"),
+            Self::NonTerminated => f.write_str("non-terminated template found"),
+            Self::EmptyTemplate => f.write_str("empty templates are not allowed"),
+            Self::Custom(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Custom(err) => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>;
+
 pub trait DisplayFn: Send + Sync {
     fn display(&self) -> String;
 }
 
-macro_rules! so_lame {
+macro_rules! display_for {
     ($($ty:ty)*) => {
         $(impl DisplayFn for $ty {
             fn display(&self) -> String {
@@ -14,7 +51,7 @@ macro_rules! so_lame {
     };
 }
 
-so_lame! {
+display_for! {
     &String String &str str
     Box<str> std::sync::Arc<str>
     i8 i16 i32 i64 i128 isize
@@ -63,7 +100,7 @@ impl<'f> Environment<'f> {
 pub trait Template: Send + Sync {
     fn name(&self) -> &str;
     fn body(&self) -> &str;
-    fn apply(&self, env: &Environment) -> String;
+    fn apply(&self, env: &Environment) -> Result<String>;
 }
 
 pub struct SimpleTemplate {
@@ -93,23 +130,24 @@ impl Template for SimpleTemplate {
         &self.data
     }
 
-    fn apply(&self, env: &Environment) -> String {
-        ParsedTemplate::parse(&self.data).unwrap().apply(env)
+    fn apply(&self, env: &Environment) -> Result<String> {
+        let out = ParsedTemplate::parse(&self.data)?.apply(env);
+        Ok(out)
     }
 }
 
 #[derive(Clone)]
-struct ParsedTemplate<'a> {
-    data: &'a str,
-    keys: Vec<&'a str>,
+pub struct ParsedTemplate<'a> {
+    pub data: &'a str,
+    pub keys: Vec<&'a str>,
 }
 
 impl<'a> ParsedTemplate<'a> {
-    fn parse(input: &'a str) -> anyhow::Result<Self> {
+    pub fn parse(input: &'a str) -> Result<Self> {
         Self::find_keys(input).map(|keys| Self { data: input, keys })
     }
 
-    fn apply(&self, env: &Environment) -> String {
+    pub fn apply(&self, env: &Environment) -> String {
         let mut temp = self.data.to_string();
         for key in &self.keys {
             if let Some(val) = env.resolve(key) {
@@ -121,7 +159,7 @@ impl<'a> ParsedTemplate<'a> {
         temp
     }
 
-    fn find_keys(input: &'a str) -> anyhow::Result<Vec<&'a str>> {
+    pub fn find_keys(input: &'a str) -> Result<Vec<&'a str>> {
         let (mut heads, mut tails) = (vec![], vec![]);
 
         let mut last = None;
@@ -134,9 +172,7 @@ impl<'a> ParsedTemplate<'a> {
                     iter.next();
                 }
 
-                ('{', ..) if last.is_some() => {
-                    anyhow::bail!("nested templates are not allowed");
-                }
+                ('{', ..) if last.is_some() => return Err(Error::NestedTemplates),
 
                 ('}', ..) if last.is_some() => {
                     tails.push(pos);
@@ -147,7 +183,7 @@ impl<'a> ParsedTemplate<'a> {
         }
 
         if heads.len() != tails.len() {
-            anyhow::bail!("non-terminated template found")
+            return Err(Error::NonTerminated);
         }
 
         tails.reverse();
@@ -156,7 +192,7 @@ impl<'a> ParsedTemplate<'a> {
         for head in heads {
             let tail = tails.pop().unwrap();
             if tail == head + 3 {
-                anyhow::bail!("empty templates are not allowed")
+                return Err(Error::EmptyTemplate);
             }
             assert!(tail > head);
             keys.push(&input[head + 2..tail]);
