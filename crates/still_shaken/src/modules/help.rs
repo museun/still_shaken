@@ -1,25 +1,27 @@
+use crate::*;
 use std::{borrow::Cow, sync::Arc};
 
-use crate::*;
+pub struct Help;
+impl super::Initialize for Help {
+    fn initialize(
+        config: &Config,
+        commands: &mut Commands,
+        _passives: &mut Passives,
+        _executor: &Executor,
+    ) -> anyhow::Result<()> {
+        let cmd = Command::example("!help <command?>").build()?;
+        let help = HelpCommand {
+            commands: Arc::new({
+                let mut cmds = vec![cmd.clone()];
+                cmds.extend(commands.commands().cloned());
+                cmds
+            }),
+            config: Arc::new(config.clone()),
+        };
+        commands.add(cmd, move |ctx| help.call(ctx))?;
 
-pub fn initialize(
-    config: &Config,
-    commands: &mut CommandDispatch,
-    _passives: &mut Passives,
-    _executor: &Executor,
-) -> anyhow::Result<()> {
-    let cmd = Command::example("!help <command?>").build()?;
-    let help = HelpCommand {
-        commands: Arc::new({
-            let mut cmds = vec![cmd.clone()];
-            cmds.extend(commands.commands().cloned());
-            cmds
-        }),
-        config: Arc::new(config.clone()),
-    };
-    commands.add(cmd, move |ctx| help.call(ctx))?;
-
-    Ok(())
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -52,7 +54,7 @@ impl HelpCommand {
     }
 
     fn format_commands(&self, channel: &str) -> anyhow::Result<String> {
-        let custom = crate::modules::commands::get_commands(&*self.config, channel)?;
+        let custom = super::get_commands(&*self.config, channel)?;
 
         let commands = self
             .commands
@@ -76,8 +78,7 @@ impl HelpCommand {
         match self.commands.iter().find(|c| c.name() == search) {
             Some(cmd) => Ok(cmd.help().into()),
             None => {
-                let custom = crate::modules::commands::get_commands(&*self.config, channel)?;
-                match custom
+                match super::get_commands(&*self.config, channel)?
                     .into_iter()
                     .find(|(k, _)| k == search)
                     .map(|(_, v)| v.into())

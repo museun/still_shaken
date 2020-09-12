@@ -12,51 +12,31 @@ use twitchchat::messages::Privmsg;
 
 use std::{collections::HashMap, sync::Arc};
 
-pub fn initialize(
-    config: &Config,
-    commands: &mut CommandDispatch,
-    passives: &mut Passives,
-    _executor: &Executor,
-) -> anyhow::Result<()> {
-    let this = Arc::new(Commands::new(&config.modules.commands));
-
-    let iter = crate::into_iter!(
-        StoredCommand::elevated(
-            this.clone(),
-            "!set <command> <body...>",
-            Commands::set_command,
-        )?,
-        StoredCommand::elevated(
-            this.clone(),
-            "!add <command> <body...>",
-            Commands::add_command,
-        )?,
-        StoredCommand::elevated(
-            this.clone(),
-            "!edit <command> <body...>",
-            Commands::edit_command,
-        )?,
-        StoredCommand::elevated(this.clone(), "!remove <command>", Commands::remove_command)?,
-    );
-
-    commands.add_many_stored(iter)?;
-
-    passives.add({
-        let this = this;
-        move |ctx| this.clone().handle(ctx)
-    });
-
-    // TODO need to add a passive for the default handler
-
-    Ok(())
-}
-
-pub struct Commands {
+pub struct Responses {
     config: config::Commands,
     channels: Mutex<HashMap<String, Channel>>,
 }
 
-impl Commands {
+impl super::Initialize for Responses {
+    fn initialize(
+        config: &Config,
+        commands: &mut Commands,
+        passives: &mut Passives,
+        _executor: &Executor,
+    ) -> anyhow::Result<()> {
+        let s = Arc::new(Self::new(&config.modules.commands));
+
+        commands.elevated(s.clone(), "!set <command> <body...>", Self::set_command)?;
+        commands.elevated(s.clone(), "!add <command> <body...>", Self::add_command)?;
+        commands.elevated(s.clone(), "!edit <command> <body...>", Self::edit_command)?;
+        commands.elevated(s.clone(), "!remove <command>", Self::remove_command)?;
+        passives.with(s, Self::handle);
+
+        Ok(())
+    }
+}
+
+impl Responses {
     async fn handle(self: Arc<Self>, ctx: Context<Privmsg<'static>>) -> anyhow::Result<()> {
         fn get_cmd(data: &str) -> Option<&str> {
             if !data.starts_with(Command::LEADER) {
@@ -67,23 +47,23 @@ impl Commands {
                 .next()
         }
 
-        let head = get_cmd(ctx.args.data()).dont_care()?;
+        let msg = ctx.msg();
+        let head = get_cmd(msg.data()).dont_care()?;
 
         let channels = self.channels.lock().await;
         let template = channels
-            .get(ctx.args.channel())
+            .get(msg.channel())
             .dont_care()?
             .commands
             .get(head)
             .dont_care()?;
 
-        // TODO cache this
-        // TODO why is this a String value?
+        let (name, channel) = (msg.user_name(), msg.channel());
         let env = Environment::default()
-            .insert("name", ctx.args.user_name().to_string())
-            .insert("channel", ctx.args.channel().to_string());
-        let resp = template.apply(&env);
-        ctx.say(resp)
+            .insert("name", &name)
+            .insert("channel", &channel);
+
+        ctx.say(template.apply(&env))
     }
 
     async fn set_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
@@ -145,7 +125,7 @@ impl Commands {
     }
 }
 
-impl Commands {
+impl Responses {
     pub fn new(config: &config::Commands) -> Self {
         let file = &config.commands_file;
         let map = data::load_saved(file).unwrap_or_default();
@@ -197,7 +177,7 @@ impl Commands {
             None => return responder.reply(msg, "try again. you provided an empty command body"),
         };
 
-        if body.starts_with('.') | body.starts_with('/') {
+        if body.starts_with('.') || body.starts_with('/') {
             return responder.reply(msg, "lol");
         }
 

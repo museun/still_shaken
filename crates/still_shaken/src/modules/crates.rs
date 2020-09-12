@@ -1,19 +1,22 @@
 use crate::*;
 
-pub fn initialize(
-    _config: &Config,
-    commands: &mut CommandDispatch,
-    _passives: &mut Passives,
-    _executor: &Executor,
-) -> anyhow::Result<()> {
-    [
-        "!crate <crate>",  // main command
-        "!crates <crate>", // aliases
-        "!lookup <crate>", // aliases
-    ]
-    .iter()
-    .map(|cmd| commands.add(Command::example(cmd).build()?, handle))
-    .collect()
+pub struct Crates;
+impl super::Initialize for Crates {
+    fn initialize(
+        _config: &Config,
+        commands: &mut Commands,
+        _passives: &mut Passives,
+        _executor: &Executor,
+    ) -> anyhow::Result<()> {
+        [
+            "!crate <crate>",  // main command
+            "!crates <crate>", // aliases
+            "!lookup <crate>", // aliases
+        ]
+        .iter()
+        .map(|cmd| commands.add(Command::example(cmd).build()?, handle))
+        .collect()
+    }
 }
 
 async fn handle(ctx: Context<CommandArgs>) -> anyhow::Result<()> {

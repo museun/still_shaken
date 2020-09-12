@@ -10,26 +10,27 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub fn initialize(
-    config: &Config,
-    commands: &mut CommandDispatch,
-    passives: &mut Passives,
-    _executor: &Executor,
-) -> anyhow::Result<()> {
-    let this = Arc::new(Shaken::new(&config.modules.shaken));
-    commands.add_stored(StoredCommand::new(this.clone(), "!speak", Shaken::speak)?)?;
-    passives.add({
-        let this = this;
-        move |ctx| this.clone().handle(ctx)
-    });
-    Ok(())
-}
-
 pub struct Shaken {
     timeout: Duration,
     generate: Arc<String>,
     config: config::Shaken,
     last: Mutex<Option<Instant>>,
+}
+
+impl super::Initialize for Shaken {
+    fn initialize(
+        config: &Config,
+        commands: &mut Commands,
+        passives: &mut Passives,
+        _executor: &Executor,
+    ) -> anyhow::Result<()> {
+        let this = Arc::new(Shaken::new(&config.modules.shaken));
+
+        commands.command(this.clone(), "!speak", Shaken::speak)?;
+        passives.with(this, Shaken::handle);
+
+        Ok(())
+    }
 }
 
 impl Shaken {

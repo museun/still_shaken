@@ -112,11 +112,11 @@ impl Callable<CommandArgs> for StoredCommand {
 }
 
 #[derive(Default)]
-pub struct CommandDispatch {
+pub struct Commands {
     commands: HashMap<Arc<Command>, Box<dyn Callable<CommandArgs, Fut = AnyhowFut<'static>>>>,
 }
 
-impl CommandDispatch {
+impl Commands {
     pub fn add(
         &mut self,
         cmd: Command,
@@ -125,6 +125,34 @@ impl CommandDispatch {
         // TODO assert about overridden commands
         self.commands.insert(Arc::new(cmd), Box::new(callable));
         Ok(())
+    }
+
+    pub fn command<T, Fut>(
+        &mut self,
+        this: Arc<T>,
+        example: &str,
+        func: impl Fn(Arc<T>, Context<CommandArgs>) -> Fut + Send + Sync + 'static,
+    ) -> anyhow::Result<()>
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<()>>,
+        Fut: Send + Sync + 'static,
+    {
+        self.add_stored(StoredCommand::new(this, example, func)?)
+    }
+
+    pub fn elevated<T, Fut>(
+        &mut self,
+        this: Arc<T>,
+        example: &str,
+        func: impl Fn(Arc<T>, Context<CommandArgs>) -> Fut + Send + Sync + 'static,
+    ) -> anyhow::Result<()>
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<()>>,
+        Fut: Send + Sync + 'static,
+    {
+        self.add_stored(StoredCommand::elevated(this, example, func)?)
     }
 
     pub fn add_many_stored(
@@ -148,7 +176,7 @@ impl CommandDispatch {
     }
 }
 
-impl Callable<Privmsg<'static>> for CommandDispatch {
+impl Callable<Privmsg<'static>> for Commands {
     type Fut = AnyhowFut<'static>;
 
     fn call(&self, state: Context<Privmsg<'static>>) -> Self::Fut {
@@ -188,13 +216,13 @@ mod tests {
     use super::*;
     #[test]
     fn command_thing() {
-        fn make_commands() -> CommandDispatch {
+        fn make_commands() -> Commands {
             let hello = Command::example("!hello").build().unwrap();
             let repeat_this = Command::example("!repeat <this...>").build().unwrap();
             let maybe = Command::example("!maybe <something?>").build().unwrap();
             let elevated = Command::example("!shutdown").elevated().build().unwrap();
 
-            let mut dispatch = CommandDispatch::default();
+            let mut dispatch = Commands::default();
             dispatch
                 .add(hello, |ctx: Context<CommandArgs>| async move {
                     ctx.say(format!("hello {}", ctx.args.msg.name()))

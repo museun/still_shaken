@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
     let config = Config::load();
     let executor = Executor::new(6);
 
-    let mut commands = CommandDispatch::default();
+    let mut commands = Commands::default();
     let mut passives = Passives::new(executor.clone());
 
     modules::initialize_modules(&config, &mut commands, &mut passives, &executor)?;

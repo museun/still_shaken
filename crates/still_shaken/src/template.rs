@@ -42,17 +42,16 @@ where
 }
 
 #[derive(Default)]
-pub struct Environment {
-    pub env: HashMap<String, Box<dyn DisplayFn>>,
+pub struct Environment<'f> {
+    pub env: HashMap<String, &'f dyn DisplayFn>,
 }
 
-impl Environment {
-    pub fn insert<K, F>(mut self, key: K, d: F) -> Self
+impl<'f> Environment<'f> {
+    pub fn insert<K>(mut self, key: K, d: &'f dyn DisplayFn) -> Self
     where
         K: Into<String>,
-        F: DisplayFn + 'static,
     {
-        self.env.insert(key.into(), Box::new(d));
+        self.env.insert(key.into(), d);
         self
     }
 
@@ -95,8 +94,7 @@ impl Template for SimpleTemplate {
     }
 
     fn apply(&self, env: &Environment) -> String {
-        let parsed = ParsedTemplate::parse(&self.data).unwrap();
-        parsed.apply(env)
+        ParsedTemplate::parse(&self.data).unwrap().apply(env)
     }
 }
 

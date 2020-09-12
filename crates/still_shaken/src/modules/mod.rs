@@ -1,22 +1,40 @@
 use crate::*;
 
-mod commands;
-mod crates;
-mod shaken;
+macro_rules! import {
+    ($($ident:ident)*) => {
+        $(
+            mod $ident; use $ident::*;
+        )*
+    };
+}
 
-mod help;
+import! {
+    responses
+    crates
+    shaken
+    help
+}
 
 pub fn initialize_modules(
     config: &Config,
-    commands: &mut CommandDispatch,
+    commands: &mut Commands,
     passives: &mut Passives,
     executor: &Executor,
 ) -> anyhow::Result<()> {
-    crates::initialize(config, commands, passives, executor)?;
-    commands::initialize(config, commands, passives, executor)?;
-    shaken::initialize(config, commands, passives, executor)?;
+    Crates::initialize(config, commands, passives, executor)?;
+    Responses::initialize(config, commands, passives, executor)?;
+    Shaken::initialize(config, commands, passives, executor)?;
 
     // this has to be last
-    help::initialize(config, commands, passives, executor)?;
+    Help::initialize(config, commands, passives, executor)?;
     Ok(())
+}
+
+trait Initialize {
+    fn initialize(
+        config: &Config,
+        commands: &mut Commands,
+        passives: &mut Passives,
+        executor: &Executor,
+    ) -> anyhow::Result<()>;
 }

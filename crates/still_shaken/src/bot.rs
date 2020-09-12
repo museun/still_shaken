@@ -16,7 +16,7 @@ mod command;
 pub use command::Command;
 
 mod command_dispatch;
-pub use command_dispatch::{CommandArgs, CommandDispatch, StoredCommand};
+pub use command_dispatch::{CommandArgs, Commands, StoredCommand};
 
 // mod modules;
 
