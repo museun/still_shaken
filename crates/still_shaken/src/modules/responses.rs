@@ -130,6 +130,8 @@ impl Responses {
             None => format!("'{}' does not exist", cmd),
         };
 
+        self.sync_commands().await?;
+
         ctx.reply(out)
     }
 }
