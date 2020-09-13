@@ -1,6 +1,7 @@
 use super::*;
+
 #[test]
-fn parse_command() {
+fn parse_good() {
     let tests = vec![
         "!foo <req> <opt?>",
         "!foo <req> <opt?> <opt2?>",
@@ -12,10 +13,12 @@ fn parse_command() {
     ];
 
     for test in tests {
-        // TODO assert
         Command::example(test).build().unwrap();
     }
+}
 
+#[test]
+fn parse_failure() {
     let tests = vec![
         "!foo <opt?> <req>",
         "!foo <flex...> <opt?>",
@@ -28,10 +31,12 @@ fn parse_command() {
     ];
 
     for test in tests {
-        // TODO assert
         Command::example(test).build().unwrap_err();
     }
+}
 
+#[test]
+fn matched() {
     use ExtractResult::*;
 
     let cmd = Command::example("!hello <name> <other?> <rest...>")
@@ -47,9 +52,13 @@ fn parse_command() {
     for input in &["!testing world this is a test", "!", ""] {
         assert!(matches!(cmd.extract(*input), NoMatch))
     }
+}
+
+#[test]
+fn extract() {
+    use ExtractResult::*;
 
     let cmd = Command::example("!hello <name> <other>").build().unwrap();
-
     let map = match cmd.extract("!hello world testing this") {
         Found(map) => map,
         _ => panic!(),
