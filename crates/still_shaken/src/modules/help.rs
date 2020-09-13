@@ -52,7 +52,7 @@ impl Help {
         let commands = self
             .commands
             .iter()
-            .map(|d| d.name())
+            .map(|d| d.command())
             .chain(custom.iter().map(|(k, _)| &**k))
             .fold(String::new(), |mut a, c| {
                 if !a.is_empty() {
@@ -68,7 +68,7 @@ impl Help {
 
     fn lookup(&self, cmd: &str, channel: &str) -> anyhow::Result<Cow<'_, str>> {
         let search = cmd.trim_start_matches(shaken_commands::Command::LEADER);
-        match self.commands.iter().find(|c| c.name() == search) {
+        match self.commands.iter().find(|c| c.command() == search) {
             Some(cmd) => Ok(cmd.help().into()),
             None => {
                 match super::get_commands(&self.config, channel)?

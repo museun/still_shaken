@@ -18,6 +18,23 @@ fn parse_good() {
 }
 
 #[test]
+fn display() {
+    let tests = vec![
+        "!foo <req> <opt?>",
+        "!foo <req> <opt?> <opt2?>",
+        "!foo <req> <opt?> <flex...>",
+        "!foo <req> <flex...>",
+        "!foo <flex...>",
+        "!foo <opt?> <flex...>",
+        "!foo <opt?> <opt2?> <flex...>",
+    ];
+
+    for test in tests {
+        assert_eq!(Command::example(test).build().unwrap().to_string(), test);
+    }
+}
+
+#[test]
 fn parse_failure() {
     let tests = vec![
         "!foo <opt?> <req>",

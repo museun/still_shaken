@@ -12,6 +12,12 @@ pub struct Command {
     args: Box<[Arg]>,
 }
 
+impl std::fmt::Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&*self.help)
+    }
+}
+
 impl Hash for Command {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.command.as_bytes());
@@ -41,7 +47,7 @@ impl Command {
         self.parse()
     }
 
-    pub const fn name(&self) -> &str {
+    pub const fn command(&self) -> &str {
         &*self.command
     }
 
@@ -56,15 +62,11 @@ impl Command {
     pub fn extract<'a, 'b>(&'a self, mut input: &'b str) -> ExtractResult<'a, 'b> {
         use ArgKind::*;
 
-        // match and remove the command
         input = input.trim_start_matches(Self::LEADER);
         if !input.starts_with(&*self.command) {
             return ExtractResult::NoMatch;
         }
-        // and any spaces between command and first argument
         input = input[self.command.len()..].trim_start();
-
-        // if the input string is empty and we require an arg then this does not match
         if input.is_empty() && Self::contains(&self.args, &[Required]) {
             return ExtractResult::Required;
         }
@@ -73,7 +75,6 @@ impl Command {
 
         for Arg { data, ty } in &*self.args {
             match (ty, input.find(' ')) {
-                // if we're at the end take the rest
                 (Required, None) | (Optional, None) | (Flexible, ..) => {
                     if !input.is_empty() {
                         map.insert(&**data, input);
@@ -81,7 +82,6 @@ impl Command {
                     break;
                 }
 
-                // otherwise take up to the space and continue
                 (.., Some(next)) => {
                     map.insert(&**data, &input[..next]);
                     input = &input[next + 1..];
