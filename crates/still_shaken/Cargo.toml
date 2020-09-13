@@ -7,6 +7,7 @@ default-run = "still_shaken"
 
 [dependencies]
 shaken_template = { path = "../shaken_template" }
+shaken_commands = { path = "../shaken_commands" }
 
 alto_logger      = "0.3.7"
 anyhow           = "1.0.32"

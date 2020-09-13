@@ -2,7 +2,7 @@ use crate::*;
 use std::{borrow::Cow, sync::Arc};
 
 pub struct Help {
-    commands: Vec<Command>,
+    commands: Vec<ShakenCommand>,
     config: Config,
 }
 
@@ -14,7 +14,9 @@ impl super::Initialize for Help {
         _executor: &Executor,
     ) -> anyhow::Result<()> {
         // add the dummy help command show it shows up in itself
-        let mut cmds = vec![Command::example("!help <command?>").build()?];
+        let mut cmds = vec![shaken_commands::Command::example("!help <command?>")
+            .build()?
+            .into()];
         cmds.extend(commands.commands().cloned());
 
         // and this is the real command
@@ -26,7 +28,7 @@ impl super::Initialize for Help {
 }
 
 impl Help {
-    const fn new(commands: Vec<Command>, config: Config) -> Self {
+    const fn new(commands: Vec<ShakenCommand>, config: Config) -> Self {
         Self { commands, config }
     }
 
@@ -56,7 +58,7 @@ impl Help {
                 if !a.is_empty() {
                     a.push_str(", ");
                 }
-                a.push_str(Command::LEADER);
+                a.push_str(shaken_commands::Command::LEADER);
                 a.push_str(c);
                 a
             });
@@ -65,7 +67,7 @@ impl Help {
     }
 
     fn lookup(&self, cmd: &str, channel: &str) -> anyhow::Result<Cow<'_, str>> {
-        let search = cmd.trim_start_matches(Command::LEADER);
+        let search = cmd.trim_start_matches(shaken_commands::Command::LEADER);
         match self.commands.iter().find(|c| c.name() == search) {
             Some(cmd) => Ok(cmd.help().into()),
             None => {

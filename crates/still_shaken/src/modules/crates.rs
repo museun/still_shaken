@@ -14,7 +14,7 @@ impl super::Initialize for Crates {
             "!lookup <crate>", // aliases
         ]
         .iter()
-        .map(|cmd| commands.add(Command::example(cmd).build()?, handle))
+        .map(|cmd| commands.add(shaken_commands::Command::example(cmd).build()?, handle))
         .collect()
     }
 }

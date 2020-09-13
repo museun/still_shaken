@@ -48,10 +48,10 @@ impl super::Initialize for Responses {
 impl Responses {
     async fn handle(self: Arc<Self>, ctx: Context<Privmsg<'static>>) -> anyhow::Result<()> {
         fn get_cmd(data: &str) -> Option<&str> {
-            if !data.starts_with(Command::LEADER) {
+            if !data.starts_with(shaken_commands::Command::LEADER) {
                 return None;
             }
-            data.trim_start_matches(Command::LEADER)
+            data.trim_start_matches(shaken_commands::Command::LEADER)
                 .split_whitespace()
                 .next()
         }
