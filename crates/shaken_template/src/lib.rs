@@ -79,16 +79,13 @@ where
 }
 
 #[derive(Default)]
-pub struct Environment<'f> {
-    pub env: HashMap<String, &'f dyn DisplayFn>,
+pub struct Environment<'k, 'f> {
+    pub env: HashMap<&'k str, &'f dyn DisplayFn>,
 }
 
-impl<'f> Environment<'f> {
-    pub fn insert<K>(mut self, key: K, d: &'f dyn DisplayFn) -> Self
-    where
-        K: Into<String>,
-    {
-        self.env.insert(key.into(), d);
+impl<'k, 'f> Environment<'k, 'f> {
+    pub fn insert(mut self, key: &'k str, d: &'f dyn DisplayFn) -> Self {
+        self.env.insert(key, d);
         self
     }
 

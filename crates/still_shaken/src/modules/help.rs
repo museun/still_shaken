@@ -41,7 +41,7 @@ impl Help {
             }
             None => {
                 let commands = self.format_commands(channel)?;
-                context.say(&*commands)
+                context.say(commands)
             }
         }
     }
@@ -58,7 +58,7 @@ impl Help {
                 if !a.is_empty() {
                     a.push_str(", ");
                 }
-                a.push_str(shaken_commands::Command::LEADER);
+                a.push_str(Command::LEADER);
                 a.push_str(c);
                 a
             });
@@ -67,7 +67,7 @@ impl Help {
     }
 
     fn lookup(&self, cmd: &str, channel: &str) -> anyhow::Result<Cow<'_, str>> {
-        let search = cmd.trim_start_matches(shaken_commands::Command::LEADER);
+        let search = cmd.trim_start_matches(Command::LEADER);
         match self.commands.iter().find(|c| c.command() == search) {
             Some(cmd) => Ok(cmd.help().into()),
             None => {
