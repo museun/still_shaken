@@ -1,9 +1,7 @@
 use crate::*;
+use modules::Components;
 
 use async_mutex::Mutex;
-use error::DontCare;
-
-use modules::Components;
 use twitchchat::messages::Privmsg;
 
 use std::{

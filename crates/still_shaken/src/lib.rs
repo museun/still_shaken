@@ -1,5 +1,6 @@
 #[macro_use]
 mod error;
+use error::*;
 
 #[macro_use]
 // pin-project-lite makes pub(crate) projections

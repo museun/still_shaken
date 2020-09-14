@@ -1,6 +1,6 @@
+use crate::*;
 use modules::Components;
 
-use crate::*;
 use std::{borrow::Cow, sync::Arc};
 
 pub struct Help {

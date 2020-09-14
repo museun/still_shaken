@@ -1,6 +1,5 @@
-use modules::Components;
-
 use crate::*;
+use modules::Components;
 
 pub struct Crates;
 impl super::Initialize for Crates {

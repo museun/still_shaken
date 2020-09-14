@@ -1,6 +1,5 @@
 use crate::*;
 
-use error::DontCare;
 use modules::Components;
 use persist::{Persist, Toml};
 use responder::Responder;
