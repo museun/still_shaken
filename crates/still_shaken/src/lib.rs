@@ -13,7 +13,8 @@ pub use bot::*;
 mod config;
 pub use config::Config;
 
-pub mod format;
+mod format;
+pub use format::*;
 
 mod http;
 
