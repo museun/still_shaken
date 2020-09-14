@@ -1,10 +1,14 @@
-use crate::format::FormatTime;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::*;
 
-pub struct Uptime {
-    start: std::time::Instant,
+pub struct Uptime(Instant);
+
+impl Uptime {
+    fn new() -> Arc<Self> {
+        Arc::new(Self(Instant::now()))
+    }
 }
 
 impl super::Initialize for Uptime {
@@ -14,25 +18,13 @@ impl super::Initialize for Uptime {
         _passives: &mut crate::Passives,
         _executor: &crate::Executor,
     ) -> anyhow::Result<()> {
-        commands.command(
-            Arc::new(Self::new()), //
-            "!uptime",
-            Uptime::uptime,
-        )
-    }
-}
+        let handle = |this: Arc<Self>, ctx: Context<CommandArgs>| async move {
+            ctx.say(format!(
+                "I've been running for {}",
+                this.0.elapsed().relative_time()
+            ))
+        };
 
-impl Uptime {
-    fn new() -> Self {
-        Self {
-            start: std::time::Instant::now(),
-        }
-    }
-
-    async fn uptime(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
-        ctx.say(format!(
-            "I've been running for {}",
-            self.start.elapsed().relative_time()
-        ))
+        commands.command(Self::new(), "!uptime", handle)
     }
 }
