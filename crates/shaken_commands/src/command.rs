@@ -100,7 +100,7 @@ impl Command {
             .trim_start_matches(Self::LEADER)
             .split_terminator(' ');
 
-        let command = iter.next().ok_or_else(|| Error::NoCommand)?;
+        let command = iter.next().ok_or(Error::NoCommand)?;
 
         let mut seen = HashSet::new();
         let mut args = vec![];
