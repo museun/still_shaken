@@ -1,9 +1,10 @@
 #![cfg_attr(debug_assertions, allow(dead_code))]
+use serde::{Deserialize, Serialize};
 
 pub async fn get_json_with_body<T, E>(ep: &str, body: E) -> anyhow::Result<T>
 where
-    for<'de> T: serde::Deserialize<'de> + Send + Sync + 'static,
-    E: serde::Serialize + Send + Sync + 'static,
+    for<'de> T: Deserialize<'de> + Send + Sync + 'static,
+    E: Serialize + Send + Sync + 'static,
 {
     let ep = ep.to_string();
     blocking::unblock(move || sync_get_json_with_body(&*ep, &body)).await
@@ -11,7 +12,7 @@ where
 
 pub async fn get_json<T>(ep: &str) -> anyhow::Result<T>
 where
-    for<'de> T: serde::Deserialize<'de> + Send + Sync + 'static,
+    for<'de> T: Deserialize<'de> + Send + Sync + 'static,
 {
     let ep = ep.to_string();
     blocking::unblock(move || sync_get_json(&*ep)).await
@@ -19,8 +20,8 @@ where
 
 pub fn sync_get_json_with_body<T, E>(ep: &str, body: &E) -> anyhow::Result<T>
 where
-    for<'de> T: serde::Deserialize<'de> + Send + Sync + 'static,
-    E: serde::Serialize + Send + Sync + 'static + ?Sized,
+    for<'de> T: Deserialize<'de> + Send + Sync + 'static,
+    E: Serialize + Send + Sync + 'static + ?Sized,
 {
     attohttpc::get(ep)
         .json(&body)?
@@ -31,7 +32,7 @@ where
 
 pub fn sync_get_json<T>(ep: &str) -> anyhow::Result<T>
 where
-    for<'de> T: serde::Deserialize<'de> + Send + Sync + 'static,
+    for<'de> T: Deserialize<'de> + Send + Sync + 'static,
 {
     attohttpc::get(ep).send()?.json().map_err(Into::into)
 }
