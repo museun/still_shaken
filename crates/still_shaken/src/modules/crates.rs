@@ -1,5 +1,6 @@
 use crate::*;
 use modules::Components;
+use shaken_commands::Command;
 
 pub struct Crates;
 impl super::Initialize for Crates {
@@ -10,7 +11,7 @@ impl super::Initialize for Crates {
             "!lookup <crate>", // aliases
         ]
         .iter()
-        .map(|cmd| commands.add(shaken_commands::Command::example(cmd).build()?, handle))
+        .map(|cmd| commands.add(Command::example(cmd).build()?, handle))
         .collect()
     }
 }
