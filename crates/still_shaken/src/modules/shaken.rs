@@ -67,7 +67,7 @@ impl Shaken {
 
     async fn generate(self: Arc<Self>, context: &str) -> anyhow::Result<Option<String>> {
         if let Some(dur) = &*self.last.lock().await {
-            if dur.elapsed() < self.timeout || fastrand::f64() <= self.config.ignore_chance {
+            if dur.elapsed() < self.timeout || fastrand::f64() >= self.config.ignore_chance {
                 return Ok(None);
             }
         }
@@ -89,8 +89,7 @@ impl Shaken {
 
     async fn random_delay(&self) {
         let lower = std::cmp::max(self.config.delay_lower, self.config.delay_upper / 10);
-        let upper = fastrand::u64(lower..self.config.delay_upper);
-        let range = fastrand::u64(self.config.delay_lower..upper);
+        let range = fastrand::u64(lower..self.config.delay_upper);
         let delay = Duration::from_millis(range);
         async_io::Timer::after(delay).await;
     }
