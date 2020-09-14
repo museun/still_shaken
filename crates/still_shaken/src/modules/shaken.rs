@@ -24,10 +24,10 @@ impl super::Initialize for Shaken {
         passives: &mut Passives,
         _executor: &Executor,
     ) -> anyhow::Result<()> {
-        let this = Arc::new(Shaken::new(&config.modules.shaken));
+        let this = Arc::new(Self::new(&config.modules.shaken));
 
-        commands.command(this.clone(), "!speak", Shaken::speak)?;
-        passives.with(this, Shaken::handle);
+        commands.command(this.clone(), "!speak", Self::speak)?;
+        passives.with(this, Self::handle);
 
         Ok(())
     }
