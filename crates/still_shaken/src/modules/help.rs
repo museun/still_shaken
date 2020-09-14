@@ -1,10 +1,11 @@
 use crate::*;
 use modules::Components;
+use shaken_commands::Command;
 
 use std::{borrow::Cow, sync::Arc};
 
 pub struct Help {
-    commands: Vec<ShakenCommand>,
+    commands: Vec<Command>,
     config: Config,
 }
 
@@ -15,9 +16,7 @@ impl super::Initialize for Help {
         }: &mut Components<'_>,
     ) -> anyhow::Result<()> {
         // add the dummy help command show it shows up in itself
-        let mut cmds = vec![shaken_commands::Command::example("!help <command?>")
-            .build()?
-            .into()];
+        let mut cmds = vec![Command::example("!help <command?>").build()?];
         cmds.extend(commands.commands().cloned());
 
         // and this is the real command
@@ -29,7 +28,7 @@ impl super::Initialize for Help {
 }
 
 impl Help {
-    const fn new(commands: Vec<ShakenCommand>, config: Config) -> Self {
+    const fn new(commands: Vec<Command>, config: Config) -> Self {
         Self { commands, config }
     }
 

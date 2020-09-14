@@ -13,7 +13,7 @@ mod handler;
 pub use handler::{AnyhowFut, Callable, Context, Respond};
 
 mod commands;
-pub use commands::{CommandArgs, Commands, ShakenCommand, StoredCommand};
+pub use commands::{CommandArgs, Commands, StoredCommand};
 
 mod state;
 pub use state::State;

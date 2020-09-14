@@ -3,49 +3,12 @@ use crate::{util::PrivmsgExt, Context};
 
 use shaken_commands::{Command, ExtractResult};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct ShakenCommand {
-    inner: Command,
-    elevated: bool,
-}
-
-impl From<shaken_commands::Command> for ShakenCommand {
-    fn from(inner: shaken_commands::Command) -> Self {
-        Self {
-            inner,
-            elevated: false,
-        }
-    }
-}
-
-impl ShakenCommand {
-    pub fn elevated(self) -> Self {
-        Self {
-            elevated: true,
-            ..self
-        }
-    }
-}
-
-impl std::ops::Deref for ShakenCommand {
-    type Target = Command;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl std::ops::DerefMut for ShakenCommand {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 use std::{collections::HashMap, future::Future, sync::Arc};
 use twitchchat::messages::Privmsg;
 
 #[derive(Clone)]
 pub struct CommandArgs {
-    pub cmd: Arc<ShakenCommand>,
+    pub cmd: Arc<Command>,
     pub msg: Arc<Privmsg<'static>>,
     pub map: HashMap<Box<str>, Box<str>>, // this is lame
 }
@@ -93,7 +56,7 @@ impl CommandArgs {
 }
 
 pub struct StoredCommand {
-    cmd: ShakenCommand,
+    cmd: Command,
     callable: Box<dyn Fn(Context<CommandArgs>) -> AnyhowFut<'static> + Send>,
 }
 
@@ -134,21 +97,12 @@ impl StoredCommand {
         T: Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>>,
         Fut: Send + Sync + 'static,
-        F: Fn(ShakenCommand) -> ShakenCommand,
+        F: Fn(Command) -> Command,
     {
-        let cmd = map(ShakenCommand {
-            inner: Command::example(example),
-            elevated: false,
-        });
-
-        let elevated = cmd.elevated;
-        let inner = cmd.inner.build()?;
-
-        let ok = Self {
+        Ok(Self {
             callable: Box::new(move |ctx| Box::pin(func(this.clone(), ctx))),
-            cmd: ShakenCommand { inner, elevated },
-        };
-        Ok(ok)
+            cmd: map(Command::example(example)).build()?,
+        })
     }
 }
 
@@ -161,7 +115,7 @@ impl Callable<CommandArgs> for StoredCommand {
 
 #[derive(Default)]
 pub struct Commands {
-    commands: HashMap<Arc<ShakenCommand>, Box<dyn Callable<CommandArgs, Fut = AnyhowFut<'static>>>>,
+    commands: HashMap<Arc<Command>, Box<dyn Callable<CommandArgs, Fut = AnyhowFut<'static>>>>,
 }
 
 impl Commands {
@@ -171,13 +125,7 @@ impl Commands {
         callable: impl Callable<CommandArgs, Fut = AnyhowFut<'static>>,
     ) -> anyhow::Result<()> {
         // TODO assert about overridden commands
-        self.commands.insert(
-            Arc::new(ShakenCommand {
-                inner: cmd,
-                elevated: false,
-            }),
-            Box::new(callable),
-        );
+        self.commands.insert(Arc::new(cmd), Box::new(callable));
         Ok(())
     }
 
@@ -216,7 +164,7 @@ impl Commands {
         Ok(())
     }
 
-    pub fn commands(&self) -> impl Iterator<Item = &ShakenCommand> {
+    pub fn commands(&self) -> impl Iterator<Item = &Command> {
         self.commands.keys().map(|s| &**s)
     }
 }
@@ -236,7 +184,7 @@ impl Callable<Privmsg<'static>> for Commands {
                 ExtractResult::NoMatch => continue,
             };
 
-            if k.elevated && !state.args.is_above_user_level() {
+            if k.is_elevated() && !state.args.is_above_user_level() {
                 return Box::pin(async move { state.reply("you cannot do that") });
             }
 

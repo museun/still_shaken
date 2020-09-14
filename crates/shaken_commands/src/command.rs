@@ -10,6 +10,7 @@ pub struct Command {
     command: Box<str>,
     help: Box<str>,
     args: Box<[Arg]>,
+    elevated: bool,
 }
 
 impl std::fmt::Display for Command {
@@ -43,6 +44,11 @@ impl Command {
         }
     }
 
+    pub fn elevated(mut self) -> Self {
+        self.elevated = true;
+        self
+    }
+
     pub fn build(self) -> Result<Self, Error> {
         self.parse()
     }
@@ -53,6 +59,10 @@ impl Command {
 
     pub const fn help(&self) -> &str {
         &*self.help
+    }
+
+    pub const fn is_elevated(&self) -> bool {
+        self.elevated
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
