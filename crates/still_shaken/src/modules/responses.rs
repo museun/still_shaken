@@ -1,6 +1,7 @@
 use crate::*;
 
 use error::DontCare;
+use modules::Components;
 use persist::{Persist, Toml};
 use responder::Responder;
 
@@ -28,10 +29,12 @@ pub struct Responses {
 
 impl super::Initialize for Responses {
     fn initialize(
-        config: &Config,
-        commands: &mut Commands,
-        passives: &mut Passives,
-        _executor: &Executor,
+        Components {
+            config,
+            commands,
+            passives,
+            ..
+        }: &mut Components<'_>,
     ) -> anyhow::Result<()> {
         let s = Arc::new(Self::new(&config.modules.commands));
 

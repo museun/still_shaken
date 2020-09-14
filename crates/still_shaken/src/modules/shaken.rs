@@ -3,6 +3,7 @@ use crate::*;
 use async_mutex::Mutex;
 use error::DontCare;
 
+use modules::Components;
 use twitchchat::messages::Privmsg;
 
 use std::{
@@ -19,10 +20,12 @@ pub struct Shaken {
 
 impl super::Initialize for Shaken {
     fn initialize(
-        config: &Config,
-        commands: &mut Commands,
-        passives: &mut Passives,
-        _executor: &Executor,
+        Components {
+            config,
+            commands,
+            passives,
+            ..
+        }: &mut Components<'_>,
     ) -> anyhow::Result<()> {
         let this = Arc::new(Self::new(&config.modules.shaken));
 

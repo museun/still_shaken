@@ -1,13 +1,10 @@
+use modules::Components;
+
 use crate::*;
 
 pub struct Crates;
 impl super::Initialize for Crates {
-    fn initialize(
-        _config: &Config,
-        commands: &mut Commands,
-        _passives: &mut Passives,
-        _executor: &Executor,
-    ) -> anyhow::Result<()> {
+    fn initialize(Components { commands, .. }: &mut Components<'_>) -> anyhow::Result<()> {
         [
             "!crate <crate>",  // main command
             "!crates <crate>", // aliases

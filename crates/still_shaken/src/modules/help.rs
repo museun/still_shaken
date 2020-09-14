@@ -1,3 +1,5 @@
+use modules::Components;
+
 use crate::*;
 use std::{borrow::Cow, sync::Arc};
 
@@ -8,10 +10,9 @@ pub struct Help {
 
 impl super::Initialize for Help {
     fn initialize(
-        config: &Config,
-        commands: &mut Commands,
-        _passives: &mut Passives,
-        _executor: &Executor,
+        Components {
+            config, commands, ..
+        }: &mut Components<'_>,
     ) -> anyhow::Result<()> {
         // add the dummy help command show it shows up in itself
         let mut cmds = vec![shaken_commands::Command::example("!help <command?>")

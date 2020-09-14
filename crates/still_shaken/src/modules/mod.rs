@@ -14,13 +14,15 @@ import! {
     uptime
 }
 
+struct Components<'a> {
+    pub config: &'a Config,
+    pub commands: &'a mut Commands,
+    pub passives: &'a mut Passives,
+    pub executor: &'a Executor,
+}
+
 trait Initialize {
-    fn initialize(
-        config: &Config,
-        commands: &mut Commands,
-        passives: &mut Passives,
-        executor: &Executor,
-    ) -> anyhow::Result<()>;
+    fn initialize(components: &mut Components<'_>) -> anyhow::Result<()>;
 }
 
 pub fn initialize_modules(
@@ -29,12 +31,19 @@ pub fn initialize_modules(
     passives: &mut Passives,
     executor: &Executor,
 ) -> anyhow::Result<()> {
-    Crates::initialize(config, commands, passives, executor)?;
-    Responses::initialize(config, commands, passives, executor)?;
-    Shaken::initialize(config, commands, passives, executor)?;
-    Uptime::initialize(config, commands, passives, executor)?;
+    let components = &mut Components {
+        config,
+        commands,
+        passives,
+        executor,
+    };
+
+    Crates::initialize(components)?;
+    Responses::initialize(components)?;
+    Shaken::initialize(components)?;
+    Uptime::initialize(components)?;
 
     // this has to be last
-    Help::initialize(config, commands, passives, executor)?;
+    Help::initialize(components)?;
     Ok(())
 }

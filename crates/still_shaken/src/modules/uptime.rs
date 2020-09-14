@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::*;
+use modules::Components;
 
 pub struct Uptime(Instant);
 
@@ -12,12 +13,7 @@ impl Uptime {
 }
 
 impl super::Initialize for Uptime {
-    fn initialize(
-        _config: &crate::Config,
-        commands: &mut crate::Commands,
-        _passives: &mut crate::Passives,
-        _executor: &crate::Executor,
-    ) -> anyhow::Result<()> {
+    fn initialize(Components { commands, .. }: &mut Components<'_>) -> anyhow::Result<()> {
         let handle = |this: Arc<Self>, ctx: Context<CommandArgs>| async move {
             ctx.say(format!(
                 "I've been running for {}",
