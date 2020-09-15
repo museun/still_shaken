@@ -1,9 +1,10 @@
 use crate::*;
 
-use modules::Components;
+use super::{Components, Initialize};
 use persist::{Persist, Toml};
 use responder::Responder;
 
+use shaken_commands::Command;
 use shaken_template::{Environment, SimpleTemplate, Template};
 
 use async_mutex::Mutex;
@@ -26,7 +27,7 @@ pub struct Responses {
     channels: Mutex<HashMap<String, Channel>>,
 }
 
-impl super::Initialize for Responses {
+impl Initialize for Responses {
     fn initialize(
         Components {
             config,
@@ -37,10 +38,9 @@ impl super::Initialize for Responses {
     ) -> anyhow::Result<()> {
         let s = Arc::new(Self::new(&config.modules.commands));
 
-        commands.elevated(s.clone(), "!set <command> <body...>", Self::set_command)?;
         commands.elevated(s.clone(), "!add <command> <body...>", Self::add_command)?;
-        commands.elevated(s.clone(), "!edit <command> <body...>", Self::edit_command)?;
         commands.elevated(s.clone(), "!remove <command>", Self::remove_command)?;
+        commands.elevated(s.clone(), "!set <command> <body...>", Self::set_command)?;
         passives.with(s, Self::handle);
 
         Ok(())
@@ -78,16 +78,30 @@ impl Responses {
     }
 
     async fn set_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
-        let cmd = &ctx.args["command"];
+        let cmd = Self::get_command(&ctx);
         let body = ctx.args.get_non_empty("body");
+
+        let action = if self
+            .channels
+            .lock()
+            .await
+            .get(ctx.channel())
+            .filter(|ch| ch.commands.contains_key(&*cmd))
+            .is_some()
+        {
+            "updated"
+        } else {
+            "added"
+        };
 
         let msg = &ctx.args.msg;
         let responder = &ctx.responder();
-        self.update_template(msg, responder, cmd, body).await
+        self.update_template(msg, responder, cmd, body, action)
+            .await
     }
 
     async fn add_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
-        let cmd = &ctx.args["command"];
+        let cmd = Self::get_command(&ctx);
         let body = ctx.args.get_non_empty("body");
 
         if let Some(ch) = self.channels.lock().await.get(ctx.channel()) {
@@ -98,28 +112,12 @@ impl Responses {
 
         let msg = &ctx.args.msg;
         let responder = &ctx.responder();
-        self.update_template(msg, responder, cmd, body).await
-    }
-
-    async fn edit_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
-        let cmd = &ctx.args["command"];
-        let body = ctx.args.get_non_empty("body");
-
-        {
-            let channels = self.channels.lock().await;
-            let ch = channels.get(ctx.channel());
-            if ch.is_none() || !ch.unwrap().commands.contains_key(&*cmd) {
-                return ctx.reply(format!("'{}' does not exist", cmd));
-            }
-        }
-
-        let msg = &ctx.args.msg;
-        let responder = &ctx.responder();
-        self.update_template(msg, responder, cmd, body).await
+        self.update_template(msg, responder, cmd, body, "added")
+            .await
     }
 
     async fn remove_command(self: Arc<Self>, ctx: Context<CommandArgs>) -> anyhow::Result<()> {
-        let cmd = &ctx.args["command"];
+        let cmd = Self::get_command(&ctx);
 
         let out = match self.channels.lock().await.get_mut(ctx.channel()) {
             Some(ch) => {
@@ -135,6 +133,10 @@ impl Responses {
         self.sync_commands().await?;
 
         ctx.reply(out)
+    }
+
+    fn get_command(ctx: &Context<CommandArgs>) -> &str {
+        ctx.args["command"].trim_start_matches(Command::LEADER)
     }
 }
 
@@ -162,6 +164,7 @@ impl Responses {
         responder: &Responder,
         cmd: &str,
         body: Option<&str>,
+        action: &str,
     ) -> anyhow::Result<()> {
         let body = match body.map(str::trim).filter(|s| !s.is_empty()) {
             Some(body) => body,
@@ -178,7 +181,7 @@ impl Responses {
             body.escape_debug()
         );
 
-        responder.reply(msg, format!("updated '{}' -> '{}'", cmd, body))?;
+        responder.reply(msg, format!("{} '{}' -> '{}'", action, cmd, body))?;
 
         self.channels
             .lock()
@@ -259,4 +262,153 @@ mod data {
     pub fn load_saved(file: &str) -> anyhow::Result<Saved> {
         Toml::load_from(file)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TestRunner;
+
+    // let s = std::fs::read_to_string(&temp).unwrap();
+    // eprintln!("{}", s)
+
+    #[test]
+    fn cannot_do_it() {
+        let commands = &[
+            "!add foo bar", //
+            "!set foo bar",
+            "!remove foo",
+        ];
+
+        for command in commands {
+            TestRunner::new(*command)
+                .reply("you cannot do that")
+                .with_module(Responses::initialize)
+                .run_commands(|| {});
+        }
+    }
+
+    #[test]
+    fn add_broadcaster() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_broadcaster("museun")
+            .reply("added 'hello' -> 'world'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    fn add_broadcaster_twice() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_broadcaster("museun")
+            .reply("added 'hello' -> 'world'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_broadcaster("museun")
+            .reply("'hello' already exists")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    fn add_moderator() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_moderator("museun")
+            .reply("added 'hello' -> 'world'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    fn add_moderator_twice() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_moderator("museun")
+            .reply("added 'hello' -> 'world'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!add hello world")
+            .with_moderator("museun")
+            .reply("'hello' already exists")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    fn set() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!set foo bar")
+            .with_broadcaster("museun")
+            .reply("added 'foo' -> 'bar'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    fn set_twice() {
+        let temp = tempfile::Builder::new().tempfile().unwrap();
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!set foo bar")
+            .with_broadcaster("museun")
+            .reply("added 'foo' -> 'bar'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!set foo bar")
+            .with_broadcaster("museun")
+            .reply("updated 'foo' -> 'bar'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+
+        let commands_file = temp.path().display().to_string();
+        TestRunner::new("!set foo bar")
+            .with_broadcaster("museun")
+            .reply("updated 'foo' -> 'bar'")
+            .config(|config| config.modules.commands.commands_file = commands_file)
+            .with_module(Responses::initialize)
+            .run_commands(|| {});
+    }
+
+    #[test]
+    #[ignore]
+    fn remove() {
+        todo!()
+    }
+
+    #[test]
+    #[ignore]
+    fn call() {}
+
+    #[test]
+    #[ignore]
+    fn call_missing() {}
 }
