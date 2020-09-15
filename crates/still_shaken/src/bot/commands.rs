@@ -194,7 +194,7 @@ impl Callable<Privmsg<'static>> for Commands {
                 msg: state.args.clone(),
                 map,
             };
-            let ctx = Context::new(args, state.state.clone());
+            let ctx = state.mapped(args);
             return Box::pin(v.call(ctx));
         }
 

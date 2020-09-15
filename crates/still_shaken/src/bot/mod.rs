@@ -20,4 +20,7 @@ pub use state::State;
 
 #[cfg(test)]
 #[allow(dead_code)]
-mod test;
+pub(crate) mod test;
+
+#[cfg(test)]
+pub use test::TestRunner;

@@ -1,4 +1,5 @@
 use crate::*;
+use modules::Components;
 
 use std::{
     borrow::Cow,
@@ -9,6 +10,7 @@ use std::{
 
 use async_mutex::Mutex;
 use futures_lite::StreamExt;
+
 use twitchchat::{
     messages::Privmsg, runner::Capabilities, runner::Identity, FromIrcMessage, IntoOwned,
 };
@@ -17,10 +19,16 @@ pub struct TestRunner {
     state: State,
     msg: Privmsg<'static>,
     output: Vec<String>,
+    executor: Executor,
+    commands: Commands,
+    passives: Passives,
 }
 
 impl TestRunner {
     pub fn new(data: impl Into<String>) -> Self {
+        let executor = Executor::new(1);
+        let passives = Passives::new(executor.clone());
+
         Self {
             msg: Self::build_msg(
                 "@id=00000000-0000-0000-0000-000000000000",
@@ -30,6 +38,9 @@ impl TestRunner {
             ),
             state: State::default(),
             output: Vec::new(),
+            commands: Commands::default(),
+            passives,
+            executor,
         }
     }
 
@@ -115,6 +126,43 @@ impl TestRunner {
         self
     }
 
+    pub fn config(mut self, config: impl FnOnce(&mut Config)) -> Self {
+        if !self.state.contains::<Config>() {
+            self.state.insert(Config::default()).unwrap();
+        }
+        config(self.state.get_mut::<Config>().unwrap());
+        self
+    }
+
+    pub fn with_module(mut self, ctor: impl Fn(&mut Components<'_>) -> anyhow::Result<()>) -> Self {
+        if !self.state.contains::<Config>() {
+            self.state.insert(Config::default()).unwrap();
+        }
+
+        let mut components = Components {
+            config: self.state.get().unwrap(),
+            commands: &mut self.commands,
+            passives: &mut self.passives,
+            executor: &self.executor,
+        };
+
+        ctor(&mut components).unwrap();
+
+        self
+    }
+
+    pub fn run_commands(mut self, before: impl Fn()) {
+        let commands = std::mem::take(&mut self.commands);
+        before();
+        let _ = self.run(commands);
+    }
+
+    pub fn run_passives(mut self, before: impl Fn()) {
+        let passives = std::mem::replace(&mut self.passives, Passives::new(self.executor.clone()));
+        before();
+        let _ = self.run(passives);
+    }
+
     pub fn run<H>(self, handler: H) -> H
     where
         H: Callable<Privmsg<'static>>,
@@ -125,27 +173,9 @@ impl TestRunner {
         let state = Arc::new(Mutex::new(self.state));
 
         let executor = Executor::new(1);
-        let identity = Arc::new(Identity::Full {
-            name: "shaken_bot".into(),
-            user_id: 241015868,
-            display_name: Some("shaken_bot".into()),
-            color: "#FF00FF".parse().unwrap(),
-            caps: Capabilities {
-                membership: false,
-                commands: false,
-                tags: true,
-                unknown: <_>::default(),
-            },
-        });
+        let identity = Self::make_identity();
 
-        let state = super::handler::ContextState {
-            responder,
-            state,
-            identity,
-            executor,
-        };
-
-        let context = Context::new(self.msg, Arc::new(state));
+        let context = Context::new(self.msg, responder, state, identity, executor);
 
         let mut responses = self.output;
         responses.reverse();
@@ -159,13 +189,12 @@ impl TestRunner {
 
             let len = responses.len();
             while let Some(msg) = rx.next().await {
-                // TODO not like this
-                // TODO read above
                 let msg = msg.to_string();
                 let resp = match responses.pop() {
                     Some(resp) => resp,
                     None => panic!("a response was expected for:\n'{}'", msg.escape_debug()),
                 };
+                // TODO make this print better (it should parse both into Privmsg and then show the semantic difference)
                 assert_eq!(resp, msg)
             }
 
@@ -187,6 +216,21 @@ impl TestRunner {
             );
 
             handler
+        })
+    }
+
+    fn make_identity() -> Arc<Identity> {
+        Arc::new(Identity::Full {
+            name: "shaken_bot".into(),
+            user_id: 241015868,
+            display_name: Some("shaken_bot".into()),
+            color: "#FF00FF".parse().unwrap(),
+            caps: Capabilities {
+                membership: false,
+                commands: false,
+                tags: true,
+                unknown: <_>::default(),
+            },
         })
     }
 

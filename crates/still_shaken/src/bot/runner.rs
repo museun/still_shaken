@@ -1,7 +1,7 @@
 use crate::error::DontCareSigil;
 
 use super::{
-    handler::{AnyhowFut, Callable, Context, ContextState},
+    handler::{AnyhowFut, Callable, Context},
     Config, Executor, Responder, Response, State,
 };
 
@@ -110,17 +110,16 @@ impl Runner {
         let responder = Self::create_responder(self.runner.writer(), &executor);
         let identity = Arc::new(self.runner.identity.clone());
 
-        let context_state = Arc::new(ContextState {
-            responder,
-            identity,
-            state: self.state.clone(),
-            executor: executor.clone(),
-        });
-
         loop {
             match self.runner.next_message().await? {
                 Status::Message(TwitchCommands::Privmsg(msg)) => {
-                    let args = Context::new(msg.clone(), context_state.clone());
+                    let args = Context::new(
+                        msg.clone(),
+                        responder.clone(),
+                        self.state.clone(),
+                        identity.clone(),
+                        executor.clone(),
+                    );
                     for active in &actives {
                         let fut = active.call(args.clone());
                         executor

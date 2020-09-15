@@ -14,14 +14,14 @@ import! {
     uptime
 }
 
-struct Components<'a> {
+pub struct Components<'a> {
     pub config: &'a Config,
     pub commands: &'a mut Commands,
     pub passives: &'a mut Passives,
     pub executor: &'a Executor,
 }
 
-trait Initialize {
+pub trait Initialize {
     fn initialize(components: &mut Components<'_>) -> anyhow::Result<()>;
 }
 

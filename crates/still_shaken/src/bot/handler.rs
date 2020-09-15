@@ -30,17 +30,24 @@ where
     }
 }
 
-pub struct ContextState {
+pub struct Context<A = Privmsg<'static>> {
+    pub args: Arc<A>,
     pub responder: Responder,
     pub state: Arc<Mutex<State>>,
     pub identity: Arc<Identity>,
     pub executor: Executor,
 }
 
-#[derive(Clone)]
-pub struct Context<A = Privmsg<'static>> {
-    pub args: Arc<A>,
-    pub state: Arc<ContextState>,
+impl<A> Clone for Context<A> {
+    fn clone(&self) -> Context<A> {
+        Self {
+            args: self.args.clone(),
+            responder: self.responder.clone(),
+            state: self.state.clone(),
+            identity: self.identity.clone(),
+            executor: self.executor.clone(),
+        }
+    }
 }
 
 impl<A> Debug for Context<A>
@@ -53,28 +60,55 @@ where
 }
 
 impl<A> Context<A> {
-    pub fn new(args: A, state: Arc<ContextState>) -> Self {
+    pub fn mapped<B>(&self, args: B) -> Context<B> {
+        let Context {
+            responder,
+            state,
+            identity,
+            executor,
+            ..
+        } = self.clone();
+
+        Context {
+            args: Arc::new(args),
+            responder,
+            state,
+            identity,
+            executor,
+        }
+    }
+
+    pub fn new(
+        args: A,
+        responder: Responder,
+        state: Arc<Mutex<State>>,
+        identity: Arc<Identity>,
+        executor: Executor,
+    ) -> Self {
         Self {
             args: Arc::new(args),
+            responder,
             state,
+            identity,
+            executor,
         }
     }
 
     pub fn responder(&self) -> &Responder {
-        &self.state.responder
+        &self.responder
     }
 
     // TODO return a guard for this
     pub fn state(&self) -> &Mutex<State> {
-        &self.state.state
+        &self.state
     }
 
     pub fn identity(&self) -> &Identity {
-        &self.state.identity
+        &self.identity
     }
 
     pub fn executor(&self) -> &Executor {
-        &self.state.executor
+        &self.executor
     }
 }
 
@@ -103,7 +137,7 @@ impl Respond for Context<Privmsg<'static>> {
     }
 
     fn responder(&self) -> &Responder {
-        &self.state.responder
+        &self.responder
     }
 }
 
@@ -113,7 +147,7 @@ impl Respond for Context<CommandArgs> {
     }
 
     fn responder(&self) -> &Responder {
-        &self.state.responder
+        &self.responder
     }
 }
 
