@@ -53,7 +53,7 @@ impl Shaken {
     }
 
     async fn handle(self: Arc<Self>, ctx: Context<Privmsg<'static>>) -> anyhow::Result<()> {
-        if ctx.args.is_mentioned(&*ctx.state.identity) {
+        if ctx.args.is_mentioned(&*ctx.identity) {
             let response = Self::fetch_response(&*self.generate, None).await?;
             let response = fixup_response(response);
             return ctx.say(response);
