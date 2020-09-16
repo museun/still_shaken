@@ -57,7 +57,7 @@ impl CommandArgs {
 
 pub struct StoredCommand {
     cmd: Command,
-    callable: Box<dyn Fn(Context<CommandArgs>) -> AnyhowFut<'static> + Send>,
+    callable: Box<dyn Fn(Context<CommandArgs>) -> AnyhowFut<'static> + Send + Sync>,
 }
 
 impl StoredCommand {

@@ -8,20 +8,20 @@ use twitchchat::{messages::Privmsg, runner::Identity};
 
 pub trait Callable<Args>
 where
-    Self: Send + 'static,
-    Args: Send + 'static,
+    Self: Send + Sync + 'static,
+    Args: Send + Sync + 'static,
 {
     type Fut: Future<Output = anyhow::Result<()>> + Send + 'static;
     fn call(&self, state: Context<Args>) -> Self::Fut;
 }
 
-pub type AnyhowFut<'t> = Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 't>>;
+pub type AnyhowFut<'t> = Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + Sync + 't>>;
 
 impl<F, Fut, Args> Callable<Args> for F
 where
-    F: Fn(Context<Args>) -> Fut + Send + 'static,
-    Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
-    Args: Send + 'static,
+    F: Fn(Context<Args>) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = anyhow::Result<()>> + Send + Sync + 'static,
+    Args: Send + Sync + 'static,
 {
     type Fut = AnyhowFut<'static>;
 

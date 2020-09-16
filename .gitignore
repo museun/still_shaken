@@ -5,3 +5,4 @@ commands.toml
 *.db
 /.vscode/*
 /.cargo/*
+*.txt

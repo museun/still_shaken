@@ -40,7 +40,7 @@ impl Passives {
     pub fn add<H, F>(&mut self, callable: H)
     where
         H: Callable<Privmsg<'static>, Fut = F> + 'static,
-        F: Future<Output = anyhow::Result<()>> + Send + 'static,
+        F: Future<Output = anyhow::Result<()>> + Send + Sync + 'static,
     {
         self.callables.push(Box::new(move |ctx| callable.call(ctx)));
     }
@@ -104,7 +104,7 @@ impl Runner {
 
     pub async fn run_to_completion(
         mut self,
-        actives: Vec<Box<ActiveCallable>>,
+        actives: &[Box<ActiveCallable>],
         executor: Executor,
     ) -> anyhow::Result<()> {
         let responder = Self::create_responder(self.runner.writer(), &executor);
@@ -120,7 +120,7 @@ impl Runner {
                         identity.clone(),
                         executor.clone(),
                     );
-                    for active in &actives {
+                    for active in actives {
                         let fut = active.call(args.clone());
                         executor
                             .spawn(async move {

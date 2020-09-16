@@ -36,16 +36,27 @@ async fn run_bot(
     executor: Executor,
     callables: Vec<Box<ActiveCallable>>,
 ) -> anyhow::Result<()> {
-    let ctrl_c = async_ctrlc::CtrlC::new()?;
+    let mut backoff = 0;
+    loop {
+        let ctrl_c = async_ctrlc::CtrlC::new()?;
 
-    let mut bot = Runner::connect(config).await?;
-    bot.join_channels().await?;
+        let mut bot = Runner::connect(config.clone()).await?;
+        bot.join_channels().await?;
 
-    let run = bot.run_to_completion(callables, executor);
-    match ctrl_c.select(run).await {
-        Left(..) => log::info!("got a ^C, exiting"),
-        Right(result) => return result,
-    };
+        let run = bot.run_to_completion(&callables, executor.clone());
+        match ctrl_c.select(run).await {
+            Left(..) => {
+                log::info!("got a ^C, exiting");
+                break Ok(());
+            }
+            Right(Err(err)) => {
+                log::error!("error whilst running: {}", err);
+                backoff += 5;
+            }
+            Right(Ok(..)) => backoff = 0,
+        };
 
-    Ok(())
+        log::info!("waiting {} seconds to reconnect", backoff);
+        async_io::Timer::after(std::time::Duration::from_secs(backoff)).await;
+    }
 }
