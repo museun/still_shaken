@@ -82,8 +82,6 @@ impl Shaken {
 
         // and then update out last spoken marker
         self.last.lock().await.replace(Instant::now());
-
-        log::trace!("generated '{}'", response.escape_debug());
         Ok(Some(response))
     }
 
