@@ -4,7 +4,7 @@ use crate::{
 };
 
 mod runner;
-pub use runner::{ActiveCallable, Passives, Runner};
+pub use runner::{ActiveCallable, Runner};
 
 mod executor;
 pub use executor::Executor;
@@ -14,6 +14,9 @@ pub use handler::{AnyhowFut, Callable, Context, Respond};
 
 mod commands;
 pub use commands::{CommandArgs, Commands, StoredCommand};
+
+mod passives;
+pub use passives::Passives;
 
 mod state;
 pub use state::State;
