@@ -92,7 +92,7 @@ where
         })
     }
 
-    pub const fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
@@ -122,7 +122,7 @@ where
     }
 
     pub fn replace(&mut self, item: T) -> anyhow::Result<&T> {
-        P::save(self.path, &item)?;
+        P::save(&self.path, &item)?;
 
         self.cached.replace(item);
         self.last.replace(Self::get_modified_time(&self.path)?);
