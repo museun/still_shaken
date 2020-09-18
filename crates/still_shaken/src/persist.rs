@@ -61,6 +61,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub struct Cached<T, P = Json> {
     path: PathBuf,
     last: Option<SystemTime>,
@@ -68,6 +69,7 @@ pub struct Cached<T, P = Json> {
     _marker: PhantomData<P>,
 }
 
+#[allow(dead_code)]
 impl<T, P> Cached<T, P>
 where
     P: Persist<T>,
