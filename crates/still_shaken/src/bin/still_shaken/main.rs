@@ -37,14 +37,14 @@ async fn run_bot(
     callables: Vec<Box<ActiveCallable>>,
 ) -> anyhow::Result<()> {
     let mut backoff = 0;
-    loop {
-        let ctrl_c = async_ctrlc::CtrlC::new()?;
+    let mut ctrl_c = async_ctrlc::CtrlC::new()?;
 
+    loop {
         let mut bot = Runner::connect(config.clone()).await?;
         bot.join_channels().await?;
 
         let run = bot.run_to_completion(&callables, executor.clone());
-        match ctrl_c.select(run).await {
+        match (&mut ctrl_c).select(run).await {
             Left(..) => {
                 log::info!("got a ^C, exiting");
                 break Ok(());
