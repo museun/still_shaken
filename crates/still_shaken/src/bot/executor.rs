@@ -3,7 +3,7 @@ use std::{future::Future, sync::Arc};
 
 #[derive(Clone)]
 pub struct Executor {
-    inner: Arc<async_executor::Executor>,
+    inner: Arc<async_executor::Executor<'static>>,
 }
 
 impl Executor {
