@@ -173,6 +173,10 @@ impl Callable<Privmsg<'static>> for Commands {
     type Fut = AnyhowFut<'static>;
 
     fn call(&self, state: Context<Privmsg<'static>>) -> Self::Fut {
+        if !state.args.data().starts_with(Command::LEADER) {
+            return Box::pin(async move { Ok(()) });
+        }
+
         for (k, v) in &self.commands {
             // we should have unique commands
             let map = match k.extract(state.args.data()) {
