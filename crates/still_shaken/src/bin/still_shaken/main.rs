@@ -40,7 +40,16 @@ async fn run_bot(
     let mut ctrl_c = async_ctrlc::CtrlC::new()?;
 
     loop {
-        let mut bot = Runner::connect(config.clone()).await?;
+        let mut bot = match Runner::connect(config.clone()).await {
+            Ok(bot) => bot,
+            Err(err) => {
+                log::error!("error connecting: {}", err);
+                log::info!("waiting {} seconds to reconnect", backoff);
+                async_io::Timer::after(std::time::Duration::from_secs(backoff)).await;
+                continue;
+            }
+        };
+
         bot.join_channels().await?;
 
         let run = bot.run_to_completion(&callables, executor.clone());

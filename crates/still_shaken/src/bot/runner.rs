@@ -22,7 +22,7 @@ impl Runner {
     pub async fn connect(config: Config) -> anyhow::Result<Self> {
         let (name, token) = (&config.identity.name, Self::get_token()?);
 
-        let connector = twitchchat::connector::AsyncIoConnectorTls::twitch();
+        let connector = twitchchat::connector::AsyncIoConnectorTls::twitch()?;
         let user_config = twitchchat::UserConfig::builder()
             .name(name)
             .token(token)
