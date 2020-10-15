@@ -39,7 +39,7 @@ impl Command {
 
     pub fn example(input: &str) -> Self {
         Self {
-            help: input.into(),
+            help: input.trim_start_matches(Self::LEADER).into(),
             ..Self::default()
         }
     }
