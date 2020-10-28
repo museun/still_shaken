@@ -47,7 +47,7 @@ impl Server {
             let _t = time_it("generating response");
             self.markov
                 .generate(
-                    &mut rand::thread_rng(),
+                    &fastrand::Rng::new(),
                     p.min.unwrap_or(Self::MIN),
                     p.max.unwrap_or(Self::MAX),
                     p.context.as_deref(),

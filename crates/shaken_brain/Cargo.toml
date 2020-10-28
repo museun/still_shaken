@@ -6,11 +6,11 @@ edition = "2018"
 
 [dependencies]
 alto_logger = "0.3.7"
-anyhow      = "1.0.32"
+anyhow      = "1.0.33"
+fastrand    = "1.4.0"
 log         = "0.4.11"
-rand        = { version = "0.7.3", features = ["small_rng"] }
-serde       = { version = "1.0.116", features = ["derive"] }
-serde_json  = "1.0.58"
+serde       = { version = "1.0.117", features = ["derive"] }
+serde_json  = "1.0.59"
 tiny_http   = "0.7.0"
 
-markov      = { git = "git://github.com/museun/markov", rev = "fe2939888a58b98342f810a5f41fbfa1e384b0c5" }
+markov      = { git = "https://github.com/museun/markov", rev = "b2d7f9f4487498c060ab8057f0c1828e2899f212" }
